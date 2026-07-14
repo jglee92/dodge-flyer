@@ -16,25 +16,28 @@ body {
   align-items: center;
   justify-content: center;
   width: 100vw;
-  height: 100vh;
+  height: calc(100vh - 26px);
 }
 
 canvas {
   touch-action: none;
 }
 
-/* 게임 캔버스 레이아웃(#app의 flex 중앙정렬)에 영향 안 주도록 고정 위치로 살짝 얹어둔다.
-   애드센스/스토어 심사가 정책 페이지를 실제로 "찾을 수 있어야" 하므로 항상 화면에 노출한다. */
+/* position: fixed로 화면 맨 아래에 띄웠더니 모바일 브라우저의 하단 주소창/툴바에
+   가려서 안 보이는 경우가 있었다. 대신 캔버스 밑에 실제 공간을 차지하는 바로 만들어서
+   어떤 기기에서도 항상 보이게 한다(애드센스/스토어 심사가 정책 페이지를 찾을 수 있어야 함). */
 #privacy-link {
-  position: fixed;
-  right: 8px;
-  bottom: 6px;
-  color: rgba(255, 255, 255, 0.35);
-  font: 11px system-ui, sans-serif;
+  display: block;
+  width: 100vw;
+  height: 26px;
+  line-height: 26px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font: 12px system-ui, sans-serif;
   text-decoration: none;
-  z-index: 10;
+  background: #0d0d0d;
 }
 
 #privacy-link:hover {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.85);
 }
