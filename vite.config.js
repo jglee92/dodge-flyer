@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 
-// GitHub Pages 프로젝트 사이트는 https://<user>.github.io/<repo>/ 형태의 하위 경로에서
-// 서빙되므로, base를 저장소 이름과 맞춰줘야 에셋 경로(js/css)가 깨지지 않는다.
+// jglee92.github.io는 GitHub Pages "유저 사이트" 저장소라 루트 경로(/)에서 서빙된다.
+// (프로젝트 사이트였다면 /<repo>/ 하위 경로라 base를 그에 맞춰야 했다.)
 export default defineConfig({
-  base: '/close-rocket/',
+  base: '/',
 })
