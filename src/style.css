@@ -22,3 +22,19 @@ body {
 canvas {
   touch-action: none;
 }
+
+/* 게임 캔버스 레이아웃(#app의 flex 중앙정렬)에 영향 안 주도록 고정 위치로 살짝 얹어둔다.
+   애드센스/스토어 심사가 정책 페이지를 실제로 "찾을 수 있어야" 하므로 항상 화면에 노출한다. */
+#privacy-link {
+  position: fixed;
+  right: 8px;
+  bottom: 6px;
+  color: rgba(255, 255, 255, 0.35);
+  font: 11px system-ui, sans-serif;
+  text-decoration: none;
+  z-index: 10;
+}
+
+#privacy-link:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
