@@ -193,7 +193,7 @@ class GameScene extends Phaser.Scene {
 
     this.createUI()
 
-    this.input.on('pointerdown', () => this.handleInput())
+    this.input.on('pointerdown', (pointer, currentlyOver) => this.handleInput(currentlyOver))
     this.input.keyboard.on('keydown-SPACE', () => this.handleInput())
 
     // 숫자키는 상점(state==='shop')에서만 스킨/불꽃 선택으로 쓰인다.
@@ -478,6 +478,7 @@ class GameScene extends Phaser.Scene {
     this.state = 'ad-placeholder'
     this.messageText.setText('📺 광고 재생 중... (자리표시자)')
     this.subMessageText.setVisible(false)
+    this.continueButtonText.setVisible(false)
     this.time.delayedCall(CONTINUE_AD_DURATION, onComplete)
   }
 
@@ -621,8 +622,10 @@ class GameScene extends Phaser.Scene {
 
     const tabLabel = this.shopTab === 'rocket' ? '[ 로켓 스킨 ]   불꽃 색상' : '로켓 스킨   [ 불꽃 색상 ]'
     const tabRow = this.add
-      .text(GAME_WIDTH / 2, 86, `${tabLabel}   (Q: 탭 전환)`, { ...style, fontSize: '13px', align: 'center' })
+      .text(GAME_WIDTH / 2, 86, `👉 ${tabLabel} (탭해서 전환)`, { ...style, fontSize: '13px', align: 'center' })
       .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.toggleShopTab())
     this.shopTexts.push(tabRow)
 
     const rocketBonus = this.getOwnedSkinsCount() * 4
@@ -665,7 +668,11 @@ class GameScene extends Phaser.Scene {
       const rowY = listTop + i * rowSpacing
       const previewKey =
         this.shopTab === 'rocket' ? this.ensureSkinPreviewTexture(item) : this.ensureFlamePreviewTexture(item)
-      const icon = this.add.image(55, rowY, previewKey).setOrigin(0.5)
+      const icon = this.add
+        .image(55, rowY, previewKey)
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => this.selectCurrent(i))
       this.shopTexts.push(icon)
 
       const label = `[${i + 1}] ${item.name}\n${statusLines.join('\n')}`
@@ -673,12 +680,16 @@ class GameScene extends Phaser.Scene {
       const row = this.add
         .text(88, rowY, label, { ...style, fontSize: statusLines.length > 1 || longestLine > 14 ? '12px' : '15px' })
         .setOrigin(0, 0.5)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => this.selectCurrent(i))
       this.shopTexts.push(row)
     })
 
     const closeLine = this.add
-      .text(GAME_WIDTH / 2, listTop + items.length * rowSpacing + 24, 'S: 닫기', { ...style, align: 'center' })
+      .text(GAME_WIDTH / 2, listTop + items.length * rowSpacing + 24, '👉 탭해서 닫기 (S)', { ...style, align: 'center' })
       .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.closeShop())
     this.shopTexts.push(closeLine)
   }
 
@@ -1562,14 +1573,35 @@ class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
 
     this.shopHintText = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 95, `🪙 ${this.totalCoins}   S: 상점 (로켓/불꽃)`, {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 95, `🪙 ${this.totalCoins}   👉 탭해서 상점 열기 (S)`, {
         ...textStyle,
         fontSize: '14px',
       })
       .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.openShop())
+    this.shopHintText.isUiButton = true
+
+    // 게임오버 화면 전용 "이어하기" 버튼. messageText 안에 힌트 문구로만 있으면 키보드가 없는
+    // 모바일에서는 누를 방법이 없어서, 탭 가능한 별도 텍스트로 분리해둔다.
+    this.continueButtonText = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 75, '📺 광고 보고 이어하기', {
+        ...textStyle,
+        fontSize: '16px',
+        color: '#ffe066',
+      })
+      .setOrigin(0.5)
+      .setVisible(false)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.tryContinue())
+    this.continueButtonText.isUiButton = true
   }
 
-  handleInput() {
+  handleInput(currentlyOver = []) {
+    // 상점 열기/이어하기 같은 전용 버튼 위를 탭했을 때는, 그 버튼 핸들러가 따로 처리하니까
+    // "탭하면 시작/재시작" 같은 화면 전체 기본 동작이 같이 발동하지 않게 막는다.
+    if (currentlyOver.some((obj) => obj.isUiButton)) return
+
     if (this.state === 'ready') {
       this.startGame()
     } else if (this.state === 'playing') {
@@ -1588,6 +1620,7 @@ class GameScene extends Phaser.Scene {
     this.subMessageText.setVisible(false)
     this.streakText.setVisible(false)
     this.shopHintText.setVisible(false)
+    this.continueButtonText.setVisible(false)
     this.spawnTimer.paused = false
     this.powerupTimer.paused = false
 
@@ -1929,13 +1962,13 @@ class GameScene extends Phaser.Scene {
   }
 
   renderGameOverTexts() {
-    const continueHint = this.usedContinueThisRun ? '' : '\nC: 광고 보고 이어하기 (1회, 자리표시자)'
-    this.messageText.setText(`게임 오버\n탭하거나 스페이스바를 눌러 재시작${continueHint}`)
+    this.messageText.setText('게임 오버\n탭하거나 스페이스바를 눌러 재시작')
     this.messageText.setVisible(true)
     this.subMessageText.setText(
       `점수: ${this.score}   최고 점수: ${this.bestScore}\n🪙 획득: ${this.lastRunCoinsEarned}   보유: ${this.totalCoins}`,
     )
     this.subMessageText.setVisible(true)
+    this.continueButtonText.setVisible(!this.usedContinueThisRun)
   }
 }
 
