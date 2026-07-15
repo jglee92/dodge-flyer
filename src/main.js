@@ -96,8 +96,8 @@ const ROCKET_SKINS = [
     body: 0x1a1a2e,
     nose: 0xff2fd4,
     fin: 0x2fe8ff,
-    unlock: { streak: 3, nearMiss: 100 },
-    bonusPercent: 5,
+    unlock: { streak: 3, nearMiss: 300 },
+    bonusPercent: 8,
   },
   {
     id: 'holo',
@@ -119,8 +119,8 @@ const ROCKET_SKINS = [
     fin: 0xffffff,
     animated: true,
     sparkleCount: 4,
-    unlock: { streak: 7, nearMiss: 200 },
-    bonusPercent: 6,
+    unlock: { streak: 7, nearMiss: 1000 },
+    bonusPercent: 12,
   },
 ]
 
@@ -157,8 +157,8 @@ const FLAME_SKINS = [
     oscType: 'sawtooth',
     freqStart: 140,
     freqEnd: 45,
-    unlock: { streak: 3, nearMiss: 100 },
-    bonusPercent: 4,
+    unlock: { streak: 3, nearMiss: 300 },
+    bonusPercent: 7,
   },
   {
     id: 'rainbow',
@@ -182,8 +182,8 @@ const FLAME_SKINS = [
     oscType: 'sine',
     freqStart: 300,
     freqEnd: 140,
-    unlock: { streak: 7, nearMiss: 200 },
-    bonusPercent: 6,
+    unlock: { streak: 7, nearMiss: 1000 },
+    bonusPercent: 10,
   },
 ]
 
@@ -563,6 +563,7 @@ class GameScene extends Phaser.Scene {
     this.obstacleGroup.children.each((obstacle) => this.destroyObstacle(obstacle))
 
     this.bird.clearTint()
+    this.bird.setAlpha(1)
     this.bird.setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2)
     this.bird.setVelocity(0, 0)
     this.physics.resume()
@@ -644,15 +645,25 @@ class GameScene extends Phaser.Scene {
     return key
   }
 
+  // 로켓/불꽃을 따로 보여주면 실제로 장착했을 때 어떻게 어우러지는지 안 보인다는 후기가 있어서,
+  // 실제 게임에서 쓰는 drawRocketTexture를 그대로 재사용해 몸통+불꽃이 합쳐진 미리보기를 만든다.
+  ensureCombinedPreviewTexture(skin, flame, flameLen = 14) {
+    const key = `preview-combo-${skin.id}-${flame.id}-${flameLen}`
+    if (this.textures.exists(key)) return key
+    this.drawRocketTexture(key, flameLen, skin, flame)
+    return key
+  }
+
   openShop() {
     if (this.state !== 'ready') return
     this.state = 'shop'
+    // 대기화면에서 둥둥 떠 있는 로켓이 상점 글 사이 빈틈으로 비쳐 보이는 문제가 있어서 숨긴다.
+    this.bird.setVisible(false)
+    this.scoreText.setVisible(false)
     this.messageText.setVisible(false)
-    this.hintText.setVisible(false)
     this.subMessageText.setVisible(false)
     this.streakText.setVisible(false)
-    this.titleText.setVisible(false)
-    this.subtitleText.setVisible(false)
+    this.titleGroup.forEach((o) => o.setVisible(false))
     this.shopButtonBg.setVisible(false)
     this.shopButtonText.setVisible(false)
     this.manualButtonBg.setVisible(false)
@@ -666,17 +677,26 @@ class GameScene extends Phaser.Scene {
       this.shopTexts = null
     }
     this.state = 'ready'
+    this.bird.setVisible(true)
+    this.scoreText.setVisible(true)
     this.messageText.setVisible(true)
-    this.hintText.setVisible(true)
     this.subMessageText.setVisible(true)
     this.streakText.setVisible(true)
-    this.titleText.setVisible(true)
-    this.subtitleText.setVisible(true)
+    this.titleGroup.forEach((o) => o.setVisible(true))
     this.shopButtonBg.setVisible(true)
     this.shopButtonText.setVisible(true)
-    this.shopButtonText.setText(`🛒 상점\n🪙 ${this.totalCoins}`)
+    this.shopButtonText.setText(`🛒 상점\n💰 ${this.totalCoins}`)
     this.manualButtonBg.setVisible(true)
     this.manualButtonText.setVisible(true)
+
+    // 상점에서 로켓/불꽃을 바꿨을 수 있으니, 표지 로고 아이콘도 최신 장착 상태로 갱신한다.
+    const skin = this.getEquippedSkin()
+    const flame = this.getEquippedFlame()
+    this.titleFlameKeys = {
+      short: this.ensureCombinedPreviewTexture(skin, flame, 12),
+      long: this.ensureCombinedPreviewTexture(skin, flame, 20),
+    }
+    this.titleRocketIcon.setTexture(this.titleFlameOn ? this.titleFlameKeys.long : this.titleFlameKeys.short)
   }
 
   toggleShopTab() {
@@ -692,38 +712,46 @@ class GameScene extends Phaser.Scene {
 
     const style = {
       fontFamily: 'system-ui, sans-serif',
-      fontSize: '15px',
+      fontSize: '13px',
       color: '#ffffff',
       stroke: '#000000',
       strokeThickness: 3,
     }
 
+    // 겹침 문제를 계속 손으로 좌표 맞추다 어긋나서, 대신 각 줄을 "위쪽 기준(origin y=0)"으로
+    // 놓고 실제 렌더된 높이(.height)를 잰 다음 커서를 그만큼 내리는 방식으로 쌓는다.
+    // 이러면 폰트/줄 수가 달라져도 항상 다음 요소가 이전 요소 아래로 확실히 밀려서 겹칠 수 없다.
+    let cursorY = 20
+
     const title = this.add
-      .text(GAME_WIDTH / 2, 56, `🛒 상점   🪙 ${this.totalCoins}`, { ...style, fontSize: '19px', align: 'center' })
-      .setOrigin(0.5)
+      .text(GAME_WIDTH / 2, cursorY, `🛒 상점   💰 ${this.totalCoins}`, { ...style, fontSize: '17px', align: 'center' })
+      .setOrigin(0.5, 0)
     this.shopTexts.push(title)
 
+    // 목록이 길어지면 아래쪽 "탭해서 닫기"까지 스크롤(이 게임엔 스크롤이 없어 화면 밖)해야
+    // 닫을 수 있는 문제가 있어서, 항상 보이는 왼쪽 위에 뒤로가기 버튼을 따로 둔다.
+    const backButton = this.add
+      .text(14, cursorY, '← 뒤로', { ...style, fontSize: '14px' })
+      .setOrigin(0, 0)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.closeShop())
+    backButton.isUiButton = true
+    this.shopTexts.push(backButton)
+
     // 첫 화면(대기화면)에 커스터마이징 미리보기를 두는 건 의미가 없다는 후기가 있어서,
-    // 대신 상점에서 지금 장착 중인 로켓/불꽃을 바로 보여준다.
-    const equipY = 80
-    const equipLabel = this.add
-      .text(GAME_WIDTH / 2 - 70, equipY, '현재 장착', { ...style, fontSize: '11px', color: '#9999aa' })
-      .setOrigin(0.5)
-    this.shopTexts.push(equipLabel)
-    const equipSkinIcon = this.add
-      .image(GAME_WIDTH / 2 - 20, equipY, this.ensureSkinPreviewTexture(this.getEquippedSkin()))
-      .setOrigin(0.5)
-    this.shopTexts.push(equipSkinIcon)
-    const equipFlameIcon = this.add
-      .image(GAME_WIDTH / 2 + 25, equipY, this.ensureFlamePreviewTexture(this.getEquippedFlame()))
-      .setOrigin(0.5)
-    this.shopTexts.push(equipFlameIcon)
+    // 대신 상점 제목 옆(오른쪽 위)에 지금 장착 중인 로켓+불꽃 합쳐진 미리보기를 작게 보여준다.
+    const equipComboIcon = this.add
+      .image(GAME_WIDTH - 34, cursorY, this.ensureCombinedPreviewTexture(this.getEquippedSkin(), this.getEquippedFlame()))
+      .setOrigin(0.5, 0)
+    this.shopTexts.push(equipComboIcon)
+
+    cursorY += Math.max(title.height, equipComboIcon.height) + 18
 
     // 탭을 하나로 합친 토글 텍스트는 어느 게 현재 탭인지 구분이 잘 안 된다는 후기가 있어서,
     // 버튼 두 개로 나누고 각각 직접 눌러서 바로 그 탭으로 이동하게 한다.
-    const tabY = 104
     const tabWidth = 150
     const tabHeight = 26
+    const tabCenterY = cursorY + tabHeight / 2
     const tabDefs = [
       { key: 'rocket', label: '🚀 로켓 스킨', x: GAME_WIDTH / 2 - tabWidth / 2 - 4 },
       { key: 'flame', label: '🔥 불꽃 색상', x: GAME_WIDTH / 2 + tabWidth / 2 + 4 },
@@ -731,7 +759,7 @@ class GameScene extends Phaser.Scene {
     tabDefs.forEach((tab) => {
       const active = this.shopTab === tab.key
       const bg = this.add
-        .rectangle(tab.x, tabY, tabWidth, tabHeight, active ? 0x3a5fd9 : 0x1a1a2e, active ? 0.95 : 0.5)
+        .rectangle(tab.x, tabCenterY, tabWidth, tabHeight, active ? 0x3a5fd9 : 0x1a1a2e, active ? 0.95 : 0.5)
         .setStrokeStyle(2, active ? 0x8fe3ff : 0x444466)
         .setInteractive({ useHandCursor: true })
         .on('pointerdown', () => {
@@ -743,81 +771,87 @@ class GameScene extends Phaser.Scene {
       this.shopTexts.push(bg)
 
       const label = this.add
-        .text(tab.x, tabY, tab.label, { ...style, fontSize: '14px', color: active ? '#ffffff' : '#9999aa' })
+        .text(tab.x, tabCenterY, tab.label, { ...style, fontSize: '12px', color: active ? '#ffffff' : '#d6d9f5' })
         .setOrigin(0.5)
       this.shopTexts.push(label)
     })
+    cursorY += tabHeight + 18
 
     const rocketBonus = this.getRocketBonusPercent()
     const flameBonus = this.getFlameBonusPercent()
     const bonusRow = this.add
-      .text(GAME_WIDTH / 2, 128, `🎁 아이템 확률 보너스   로켓 +${rocketBonus}%   불꽃 +${flameBonus}%`, {
+      .text(GAME_WIDTH / 2, cursorY, `🎁 아이템 확률 보너스   로켓 +${rocketBonus}%   불꽃 +${flameBonus}%`, {
         ...style,
-        fontSize: '11px',
+        fontSize: '12px',
+        color: '#ffe066',
         align: 'center',
       })
-      .setOrigin(0.5)
+      .setOrigin(0.5, 0)
     this.shopTexts.push(bonusRow)
+    cursorY += bonusRow.height + 20
 
     const items = this.shopTab === 'rocket' ? ROCKET_SKINS : FLAME_SKINS
     const equippedId = this.shopTab === 'rocket' ? this.getEquippedSkinId() : this.getEquippedFlameId()
     const isOwned = (id) => (this.shopTab === 'rocket' ? this.isSkinOwned(id) : this.isFlameOwned(id))
 
-    const listTop = 148
-    // 해금 조건이 둘 다 있는 잠긴 아이템은 "또는" 줄까지 3줄이 되어 기본 줄 간격(54px)을
-    // 넘칠 수 있어서, 아이템마다 실제 줄 수에 맞춰 다음 줄 위치를 누적 계산한다.
-    let rowY = listTop
+    // 아이템마다 상태 줄 수가 다르므로(잠긴 아이템은 조건 2개+구분선까지 3줄), 각 줄을
+    // 위쪽 기준으로 그리고 실제 높이만큼 커서를 내리는 동일한 방식으로 세로로 쌓는다.
+    let rowY = cursorY
     items.forEach((item, i) => {
       const owned = isOwned(item.id)
       const unlocked = this.isItemUnlocked(item)
-      const bonusTag = owned && item.bonusPercent ? ` (아이템 확률 +${item.bonusPercent}%)` : ''
       let statusLines
-      if (item.id === equippedId) statusLines = [`✅ 장착중${bonusTag}`]
-      else if (owned) statusLines = [`보유함 (선택)${bonusTag}`]
-      else if (!unlocked) {
+      if (item.id === equippedId) {
+        statusLines = ['✅ 장착중']
+      } else if (owned) {
+        statusLines = ['보유함 (선택)']
+      } else if (!unlocked) {
+        // 조건 두 개를 각각 줄로 나누고 그 사이에 구분선까지 넣으니 세로로 너무 길어져서
+        // (뒤쪽 아이템이 화면 밖으로 밀림), 둘 다 있으면 한 줄로 합쳐서 보여준다.
         statusLines = []
-        if (item.unlock.streak !== undefined) {
-          statusLines.push(`🔒 ${item.unlock.streak}일 연속 접속 필요 (현재 ${this.dailyStreak}일차)`)
-        }
         if (item.unlock.streak !== undefined && item.unlock.nearMiss !== undefined) {
-          statusLines.push('── 또는 (둘 중 하나만 채우면 OK) ──')
-        }
-        if (item.unlock.nearMiss !== undefined) {
-          statusLines.push(`아슬아슬 ${item.unlock.nearMiss}번 필요 (현재 ${this.nearMissTotal}번)`)
+          statusLines.push(
+            `🔒 ${item.unlock.streak}일 연속(${this.dailyStreak}일차) & 아슬아슬 ${item.unlock.nearMiss}번(${this.nearMissTotal}번)`,
+          )
+        } else if (item.unlock.streak !== undefined) {
+          statusLines.push(`🔒 ${item.unlock.streak}일 연속 접속 필요 (현재 ${this.dailyStreak}일차)`)
+        } else if (item.unlock.nearMiss !== undefined) {
+          statusLines.push(`🔒 아슬아슬 ${item.unlock.nearMiss}번 필요 (현재 ${this.nearMissTotal}번)`)
         }
       } else {
-        statusLines = [`🪙 ${item.cost}`]
+        statusLines = [`💰 ${item.cost}`]
+      }
+      // 로켓/불꽃마다 아이템 확률 보너스가 얼마나 늘어나는지 보유 여부와 상관없이 항상 보여줘서,
+      // 안 산 아이템도 "사면 이만큼 오른다"는 게 바로 보이게 한다.
+      if (item.bonusPercent) {
+        statusLines.push(owned ? `🎁 아이템 확률 +${item.bonusPercent}%` : `🎁 획득 시 아이템 확률 +${item.bonusPercent}%`)
       }
 
+      // 줄 수/폰트가 아이템마다 달라서 높이를 미리 계산할 수 없으니, 먼저 위쪽 기준(origin y=0)으로
+      // 텍스트를 그린 다음 실제 렌더된 높이(.height)를 재서 아이콘을 그 세로 중앙에 맞추고,
+      // 다음 아이템은 그 높이만큼 커서를 내린 위치에서 시작한다 — 절대 겹칠 수 없다.
+      const label = `[${i + 1}] ${item.name}\n${statusLines.join('\n')}`
+      const longestLine = Math.max(...statusLines.map((l) => l.length))
+      const smallFont = statusLines.length > 1 || longestLine > 13
+      const row = this.add
+        .text(88, rowY, label, { ...style, fontSize: smallFont ? '11px' : '13px' })
+        .setOrigin(0, 0)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => this.selectCurrent(i))
+      this.shopTexts.push(row)
+
+      const rowCenterY = rowY + row.height / 2
       const previewKey =
         this.shopTab === 'rocket' ? this.ensureSkinPreviewTexture(item) : this.ensureFlamePreviewTexture(item)
       const icon = this.add
-        .image(55, rowY, previewKey)
+        .image(55, rowCenterY, previewKey)
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true })
         .on('pointerdown', () => this.selectCurrent(i))
       this.shopTexts.push(icon)
 
-      const label = `[${i + 1}] ${item.name}\n${statusLines.join('\n')}`
-      const longestLine = Math.max(...statusLines.map((l) => l.length))
-      const smallFont = statusLines.length > 1 || longestLine > 14
-      const row = this.add
-        .text(88, rowY, label, { ...style, fontSize: smallFont ? '12px' : '15px' })
-        .setOrigin(0, 0.5)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerdown', () => this.selectCurrent(i))
-      this.shopTexts.push(row)
-
-      const totalLines = statusLines.length + 1
-      rowY += Math.max(48, totalLines * (smallFont ? 14 : 18) + 6)
+      rowY += Math.max(row.height, icon.height) + 10
     })
-
-    const closeLine = this.add
-      .text(GAME_WIDTH / 2, rowY + 10, '👉 탭해서 닫기 (S)', { ...style, align: 'center' })
-      .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.closeShop())
-    this.shopTexts.push(closeLine)
   }
 
   selectCurrent(index) {
@@ -840,7 +874,7 @@ class GameScene extends Phaser.Scene {
         return
       }
       if (this.totalCoins < skin.cost) {
-        this.showAchievement('🪙 코인이 부족해요!')
+        this.showAchievement('💰 코인이 부족해요!')
         return
       }
       this.totalCoins -= skin.cost
@@ -868,7 +902,7 @@ class GameScene extends Phaser.Scene {
         return
       }
       if (this.totalCoins < flame.cost) {
-        this.showAchievement('🪙 코인이 부족해요!')
+        this.showAchievement('💰 코인이 부족해요!')
         return
       }
       this.totalCoins -= flame.cost
@@ -988,9 +1022,9 @@ class GameScene extends Phaser.Scene {
   // 연속 접속일 또는 아슬아슬 누적 횟수 중 하나를 만족해야 코인으로 살 수 있게 열린다.
   isItemUnlocked(item) {
     if (!item.unlock) return true
-    const streakOk = item.unlock.streak !== undefined && this.dailyStreak >= item.unlock.streak
-    const nearMissOk = item.unlock.nearMiss !== undefined && this.nearMissTotal >= item.unlock.nearMiss
-    return streakOk || nearMissOk
+    const streakOk = item.unlock.streak === undefined || this.dailyStreak >= item.unlock.streak
+    const nearMissOk = item.unlock.nearMiss === undefined || this.nearMissTotal >= item.unlock.nearMiss
+    return streakOk && nearMissOk
   }
 
   getPowerupInterval() {
@@ -1663,15 +1697,64 @@ class GameScene extends Phaser.Scene {
     this.scoreText = this.add.text(GAME_WIDTH / 2, 40, '0', textStyle).setOrigin(0.5)
 
     // 처음 들어왔을 때 게임 이름을 명확하게 보여준다.
-    this.titleText = this.add
-      .text(GAME_WIDTH / 2, 100, 'CLOSE ROCKET', { ...textStyle, fontSize: '26px' })
+    // 표지 로고: 로켓 그림 + 알록달록한 이름 + 작은 별 장식 (포스터 느낌 참고).
+    // titleGroup에 모아두고, 상점/매뉴얼로 넘어갈 때 한 번에 숨기고 보여줄 수 있게 한다.
+    this.titleGroup = []
+
+    // 'rocket' 텍스처는 애니메이션 스킨 장착 중엔 매 프레임 다시 그려지는 살아있는 텍스처라
+    // 여기 재사용하면 깨질 수 있다. 대신 절대 안 지워지는 정적 미리보기 텍스처를 쓴다.
+    // 완전히 정지된 그림이면 밋밋해서, 짧은 불꽃/긴 불꽃 두 텍스처를 번갈아 보여줘서
+    // 실제 로켓 분사처럼 살짝 깜빡이는 느낌을 준다.
+    this.titleFlameOn = false
+    this.titleFlameKeys = {
+      short: this.ensureCombinedPreviewTexture(this.getEquippedSkin(), this.getEquippedFlame(), 12),
+      long: this.ensureCombinedPreviewTexture(this.getEquippedSkin(), this.getEquippedFlame(), 20),
+    }
+    this.titleRocketIcon = this.add
+      .image(GAME_WIDTH / 2, 68, this.titleFlameKeys.short)
       .setOrigin(0.5)
+      .setScale(2.2)
+      .setRotation(-Math.PI / 2 + 0.3)
+    this.titleGroup.push(this.titleRocketIcon)
+    this.titleFlameTimer = this.time.addEvent({
+      delay: 350,
+      loop: true,
+      callback: () => {
+        if (this.state !== 'ready') return
+        this.titleFlameOn = !this.titleFlameOn
+        this.titleRocketIcon.setTexture(this.titleFlameOn ? this.titleFlameKeys.long : this.titleFlameKeys.short)
+      },
+    })
+
+    const starDefs = [
+      { x: GAME_WIDTH / 2 - 70, y: 48, size: '14px' },
+      { x: GAME_WIDTH / 2 + 74, y: 52, size: '11px' },
+      { x: GAME_WIDTH / 2 + 60, y: 88, size: '10px' },
+      { x: GAME_WIDTH / 2 - 78, y: 84, size: '12px' },
+    ]
+    starDefs.forEach((s) => {
+      const star = this.add.text(s.x, s.y, '✨', { fontSize: s.size }).setOrigin(0.5)
+      this.titleGroup.push(star)
+    })
+
+    const closeWord = this.add
+      .text(0, 120, 'CLOSE', { ...textStyle, fontSize: '27px', color: '#ff6b4a' })
+      .setOrigin(0, 0.5)
+    const rocketWord = this.add
+      .text(0, 120, ' ROCKET', { ...textStyle, fontSize: '27px', color: '#4fc3f7' })
+      .setOrigin(0, 0.5)
+    const titleWordsWidth = closeWord.width + rocketWord.width
+    closeWord.x = GAME_WIDTH / 2 - titleWordsWidth / 2
+    rocketWord.x = closeWord.x + closeWord.width
+    this.titleGroup.push(closeWord, rocketWord)
+
     this.subtitleText = this.add
-      .text(GAME_WIDTH / 2, 130, '(아슬로켓)', { ...textStyle, fontSize: '15px' })
+      .text(GAME_WIDTH / 2, 150, '(아슬로켓)', { ...textStyle, fontSize: '15px', color: '#ffe066' })
       .setOrigin(0.5)
+    this.titleGroup.push(this.subtitleText)
 
     this.messageText = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, '탭하거나 스페이스바를 눌러 시작', {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 35, '탭하거나 스페이스바를 눌러 시작', {
         ...textStyle,
         fontSize: '22px',
         align: 'center',
@@ -1679,31 +1762,18 @@ class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
-    this.hintText = this.add
-      .text(
-        GAME_WIDTH / 2,
-        GAME_HEIGHT / 2 - 10,
-        '중력 방향이 계속 서서히 흘러가요\n벽에 닿으면 반대편으로 나와요\n🛡️💣 아이템은 클릭/탭으로 바로 획득!',
-        {
-          ...textStyle,
-          fontSize: '14px',
-          align: 'center',
-          wordWrap: { width: GAME_WIDTH - 60 },
-        },
-      )
-      .setOrigin(0.5)
-
     this.subMessageText = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 30, `최고 점수: ${this.bestScore}`, {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `최고 점수: ${this.bestScore}`, {
         ...textStyle,
         fontSize: '18px',
+        align: 'center',
       })
       .setOrigin(0.5)
 
     this.streakText = this.add
       .text(
         GAME_WIDTH / 2,
-        GAME_HEIGHT / 2 + 65,
+        GAME_HEIGHT / 2 + 30,
         this.dailyStreak >= 2 ? `🔥 ${this.dailyStreak}일 연속 접속 중!` : '오늘 첫 도전, 내일도 또 오세요!',
         { ...textStyle, fontSize: '14px' },
       )
@@ -1721,7 +1791,7 @@ class GameScene extends Phaser.Scene {
       .on('pointerdown', () => this.openShop())
     this.shopButtonBg.isUiButton = true
     this.shopButtonText = this.add
-      .text(GAME_WIDTH - 72, cornerY, `🛒 상점\n🪙 ${this.totalCoins}`, { ...textStyle, fontSize: '13px', align: 'center' })
+      .text(GAME_WIDTH - 72, cornerY, `🛒 상점\n💰 ${this.totalCoins}`, { ...textStyle, fontSize: '13px', align: 'center' })
       .setOrigin(0.5)
 
     this.manualButtonBg = this.add
@@ -1737,7 +1807,7 @@ class GameScene extends Phaser.Scene {
     // 게임오버 화면 전용 "이어하기" 버튼. messageText 안에 힌트 문구로만 있으면 키보드가 없는
     // 모바일에서는 누를 방법이 없어서, 탭 가능한 별도 텍스트로 분리해둔다.
     this.continueButtonText = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 95, '📺 광고 보고 이어하기', {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 12, '📺 광고 보고 이어하기', {
         ...textStyle,
         fontSize: '16px',
         color: '#ffe066',
@@ -1758,7 +1828,12 @@ class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setVisible(false)
       .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.scene.restart({ autoStart: true }))
+      // 이 클릭 안에서 바로 scene.restart()를 부르면, 같은 클릭 이벤트가 아직 다 처리되는
+      // 중에 새로 만들어진 대기화면의 전역 pointerdown 핸들러(handleInput)가 곧바로 한 번
+      // 더 불려서(currentlyOver가 이미 사라진 이 버튼을 못 잡아냄) "아니오"인데도 즉시
+      // startGame()이 실행돼버렸다. 다음 틱으로 미뤄서 이번 클릭 처리가 완전히 끝난 뒤에
+      // 재시작하게 하면 이 잔여 이벤트 문제가 사라진다.
+      .on('pointerdown', () => this.time.delayedCall(0, () => this.scene.restart({ autoStart: true })))
     this.restartYesText.isUiButton = true
 
     this.restartNoText = this.add
@@ -1766,7 +1841,7 @@ class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setVisible(false)
       .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.scene.restart())
+      .on('pointerdown', () => this.time.delayedCall(0, () => this.scene.restart()))
     this.restartNoText.isUiButton = true
 
     // 실드/폭탄 인벤토리 표시 (플레이 중에만 보임). 폭탄은 탭하면 바로 씀. 한 손으로 폰을 쥐고
@@ -1814,12 +1889,12 @@ class GameScene extends Phaser.Scene {
 
   showManual() {
     this.state = 'manual'
+    this.bird.setVisible(false)
+    this.scoreText.setVisible(false)
     this.messageText.setVisible(false)
-    this.hintText.setVisible(false)
     this.subMessageText.setVisible(false)
     this.streakText.setVisible(false)
-    this.titleText.setVisible(false)
-    this.subtitleText.setVisible(false)
+    this.titleGroup.forEach((o) => o.setVisible(false))
     this.shopButtonBg.setVisible(false)
     this.shopButtonText.setVisible(false)
     this.manualButtonBg.setVisible(false)
@@ -1885,13 +1960,13 @@ class GameScene extends Phaser.Scene {
   startGame() {
     this.state = 'playing'
     this.idleTween.stop()
+    this.bird.setVisible(true)
     this.bird.body.allowGravity = true
+    this.scoreText.setVisible(true)
     this.messageText.setVisible(false)
-    this.hintText.setVisible(false)
     this.subMessageText.setVisible(false)
     this.streakText.setVisible(false)
-    this.titleText.setVisible(false)
-    this.subtitleText.setVisible(false)
+    this.titleGroup.forEach((o) => o.setVisible(false))
     this.shopButtonBg.setVisible(false)
     this.shopButtonText.setVisible(false)
     this.manualButtonBg.setVisible(false)
@@ -2252,6 +2327,9 @@ class GameScene extends Phaser.Scene {
     this.bombInventoryText.setVisible(false)
     this.physics.pause()
     this.bird.setTint(0xff6666)
+    // 부딪힌 자리에 그대로 남아있으면, 죽은 위치에 따라 화면 가운데 결과 텍스트와 겹쳐서
+    // 마치 글씨가 흐릿하게 얼룩진 것처럼 보인다. 잠깐 빨갛게 보여준 다음 옅게 페이드시킨다.
+    this.tweens.add({ targets: this.bird, alpha: 0.25, duration: 500, delay: 300 })
     this.playExplosionSound()
 
     if (this.score > this.bestScore) {
@@ -2276,16 +2354,29 @@ class GameScene extends Phaser.Scene {
   }
 
   renderGameOverTexts() {
+    // 대기화면에서 쓰던 크기 그대로면 "다시하시겠습니까?" / "이어하기" / 점수 3덩어리가
+    // 다닥다닥 붙어 보여서, 게임오버 화면 전용으로 글자를 줄이고 사이 간격을 벌려준다.
+    // scene.restart()로 돌아가면 어차피 이 세 텍스트도 create()에서 원래 크기로 새로 만들어지니
+    // 여기서 스타일을 바꿔도 대기화면에는 영향이 없다.
     this.messageText.setText('게임 오버\n다시 하시겠습니까?')
+    this.messageText.setFontSize(18)
+    this.messageText.setY(GAME_HEIGHT / 2 - 88)
     this.messageText.setVisible(true)
+
+    this.continueButtonText.setFontSize(13)
+    this.continueButtonText.setY(GAME_HEIGHT / 2 - 32)
+    this.continueButtonText.setVisible(!this.usedContinueThisRun)
+
     const avgScore = this.totalGamesPlayed > 0 ? Math.round(this.totalScoreSum / this.totalGamesPlayed) : 0
     this.subMessageText.setText(
       `점수: ${this.score}   최고 점수: ${this.bestScore}\n` +
-        `🪙 획득: ${this.lastRunCoinsEarned}   보유: ${this.totalCoins}\n` +
-        `아슬아슬: ${this.runNearMissCount}번   평균 점수: ${avgScore}`,
+        `아슬아슬: ${this.runNearMissCount}번   평균 점수: ${avgScore}\n` +
+        `💰 획득: ${this.lastRunCoinsEarned}   보유: ${this.totalCoins}`,
     )
+    this.subMessageText.setFontSize(13)
+    this.subMessageText.setY(GAME_HEIGHT / 2 + 26)
     this.subMessageText.setVisible(true)
-    this.continueButtonText.setVisible(!this.usedContinueThisRun)
+
     this.showRestartPrompt()
   }
 }
