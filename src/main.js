@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import './style.css'
 import { initLeaderboard, isLeaderboardEnabled, submitScore, fetchTopScores, reportEntry } from './leaderboard.js'
 import { containsBannedWord } from './profanityFilter.js'
+import { t, toggleLang } from './i18n.js'
 
 const GAME_WIDTH = 400
 const GAME_HEIGHT = 600
@@ -54,14 +55,13 @@ const BEST_SCORE_KEY = 'dodgeflyer-best-score'
 const STREAK_DATE_KEY = 'dodgeflyer-streak-date'
 const STREAK_COUNT_KEY = 'dodgeflyer-streak-count'
 
+// text 필드 대신 i18n 키를 저장해서, 팝업이 뜨는 시점에 t()로 현재 언어에 맞게 조회한다.
 const ACHIEVEMENTS = [
-  { score: 50, text: '🌑 운석 지대 진입! 운석을 피하세요' },
-  { score: 100, text: '🌌 은하 지대 진입! 은하를 피하세요' },
-  { score: 180, text: '🕳️ 블랙홀 지대 진입! 블랙홀을 피하세요' },
-  { score: 300, text: '☄️ 카오스 지대 진입! 구름·운석·은하·블랙홀이 랜덤하게 나와요' },
+  { score: 50, key: 'achMeteor' },
+  { score: 100, key: 'achGalaxy' },
+  { score: 180, key: 'achBlackhole' },
+  { score: 300, key: 'achChaos' },
 ]
-
-const START_TIER_TEXT = '☁️ 구름 지대 시작! 구름을 피하세요'
 
 const CONTINUE_AD_DURATION = 1500 // 실제 광고 SDK 연동 전까지의 자리표시자 재생 시간(ms)
 
@@ -77,25 +77,18 @@ const HAS_SEEN_MANUAL_KEY = 'dodgeflyer-seen-manual'
 const NICKNAME_KEY = 'dodgeflyer-nickname'
 const HAS_SEEN_NICKNAME_PROMPT_KEY = 'dodgeflyer-seen-nickname-prompt'
 
-const MANUAL_TEXT =
-  '🚀 화면을 탭하거나 스페이스바로 로켓을 밀어내요\n' +
-  '🌪️ 중력 방향이 계속 서서히 바뀌어요\n' +
-  '🔄 화면 벽에 닿으면 반대편으로 나와요\n' +
-  '☁️ 장애물을 피하면 점수/코인을 얻어요\n' +
-  '🛡️💣 아이템은 탭하면 바로 획득! 폭탄은 모아뒀다가\n   원할 때 다시 탭해서 써요\n' +
-  '🛒 상점에서 코인으로 로켓/불꽃을 꾸밀 수 있어요'
-
 // bonusPercent: 보유하면 아이템 등장 확률에 더해지는 %. 싼 스킨은 조금, 비싼/한정 스킨은
 // 확실히 크게 차등을 둬서(2~6%) "체감이 안 된다"는 후기를 반영했다. 로켓 합 25% + 불꽃 합 20%
 // = 최대 45%.
+// name 필드 대신 nameKey(i18n 키)를 저장해서, 상점에 그릴 때 t(nameKey)로 현재 언어에 맞게 조회한다.
 const ROCKET_SKINS = [
-  { id: 'default', name: '기본', cost: 0, body: 0xd8d8e2, nose: 0xd23c3c, fin: 0xb52e2e },
-  { id: 'crimson', name: '크림슨', cost: 50, body: 0xe8e0e0, nose: 0x8b1e3f, fin: 0x5c1229, bonusPercent: 2 },
-  { id: 'azure', name: '아주르', cost: 120, body: 0xe4eefc, nose: 0x1b6ca8, fin: 0x0f3f66, bonusPercent: 3 },
-  { id: 'gold', name: '골드', cost: 250, body: 0xfff3c4, nose: 0xd4a017, fin: 0x8a6c0a, bonusPercent: 4 },
+  { id: 'default', nameKey: 'rocketSkinDefault', cost: 0, body: 0xd8d8e2, nose: 0xd23c3c, fin: 0xb52e2e },
+  { id: 'crimson', nameKey: 'rocketSkinCrimson', cost: 50, body: 0xe8e0e0, nose: 0x8b1e3f, fin: 0x5c1229, bonusPercent: 2 },
+  { id: 'azure', nameKey: 'rocketSkinAzure', cost: 120, body: 0xe4eefc, nose: 0x1b6ca8, fin: 0x0f3f66, bonusPercent: 3 },
+  { id: 'gold', nameKey: 'rocketSkinGold', cost: 250, body: 0xfff3c4, nose: 0xd4a017, fin: 0x8a6c0a, bonusPercent: 4 },
   {
     id: 'neon',
-    name: '🌟 네온사이버 (한정)',
+    nameKey: 'rocketSkinNeon',
     cost: 350,
     body: 0x1a1a2e,
     nose: 0xff2fd4,
@@ -105,7 +98,7 @@ const ROCKET_SKINS = [
   },
   {
     id: 'holo',
-    name: '✨ 홀로그램',
+    nameKey: 'rocketSkinHolo',
     cost: 500,
     body: 0xffffff,
     nose: 0xf0f0f0,
@@ -116,7 +109,7 @@ const ROCKET_SKINS = [
   },
   {
     id: 'diamond',
-    name: '💎 다이아몬드 (한정)',
+    nameKey: 'rocketSkinDiamond',
     cost: 800,
     body: 0xeaf6ff,
     nose: 0x3a6fa8,
@@ -129,10 +122,10 @@ const ROCKET_SKINS = [
 ]
 
 const FLAME_SKINS = [
-  { id: 'default', name: '기본', cost: 0, outer: 0xffb347, inner: 0xfff176, oscType: 'sawtooth', freqStart: 180, freqEnd: 70 },
+  { id: 'default', nameKey: 'flameSkinDefault', cost: 0, outer: 0xffb347, inner: 0xfff176, oscType: 'sawtooth', freqStart: 180, freqEnd: 70 },
   {
     id: 'blue',
-    name: '블루 플레임',
+    nameKey: 'flameSkinBlue',
     cost: 80,
     outer: 0x4fc3f7,
     inner: 0xd0f0ff,
@@ -143,7 +136,7 @@ const FLAME_SKINS = [
   },
   {
     id: 'green',
-    name: '그린 플레임',
+    nameKey: 'flameSkinGreen',
     cost: 150,
     outer: 0x66ff99,
     inner: 0xe0ffe8,
@@ -154,7 +147,7 @@ const FLAME_SKINS = [
   },
   {
     id: 'shadow',
-    name: '🌑 다크 플레임 (한정)',
+    nameKey: 'flameSkinShadow',
     cost: 220,
     outer: 0x2a0a3d,
     inner: 0x8e2fd6,
@@ -166,7 +159,7 @@ const FLAME_SKINS = [
   },
   {
     id: 'rainbow',
-    name: '🌈 레인보우 플레임',
+    nameKey: 'flameSkinRainbow',
     cost: 300,
     outer: 0xff66cc,
     inner: 0xffffff,
@@ -178,7 +171,7 @@ const FLAME_SKINS = [
   },
   {
     id: 'diamond',
-    name: '💎 다이아몬드 플레임 (한정)',
+    nameKey: 'flameSkinDiamond',
     cost: 450,
     outer: 0xbfe9ff,
     inner: 0xffffff,
@@ -519,7 +512,7 @@ class GameScene extends Phaser.Scene {
 
   showNearMissBonus(x, y) {
     const text = this.add
-      .text(x, y, '아슬아슬! +1', {
+      .text(x, y, t('nearMissBonus'), {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '15px',
         color: '#ffe066',
@@ -552,7 +545,7 @@ class GameScene extends Phaser.Scene {
     ACHIEVEMENTS.forEach((achievement) => {
       if (this.score >= achievement.score && !this.shownAchievements.has(achievement.score)) {
         this.shownAchievements.add(achievement.score)
-        this.showAchievement(achievement.text)
+        this.showAchievement(t(achievement.key))
       }
     })
   }
@@ -561,7 +554,7 @@ class GameScene extends Phaser.Scene {
 
   playPlaceholderAd(onComplete) {
     this.state = 'ad-placeholder'
-    this.messageText.setText('📺 광고 재생 중... (자리표시자)')
+    this.messageText.setText(t('adPlaceholder'))
     this.subMessageText.setVisible(false)
     this.continueButtonText.setVisible(false)
     this.hideRestartPrompt()
@@ -686,6 +679,8 @@ class GameScene extends Phaser.Scene {
     this.manualButtonText.setVisible(false)
     this.leaderboardButtonBg.setVisible(false)
     this.leaderboardButtonText.setVisible(false)
+    this.langButtonBg.setVisible(false)
+    this.langButtonText.setVisible(false)
     this.renderShop()
   }
 
@@ -703,11 +698,13 @@ class GameScene extends Phaser.Scene {
     this.titleGroup.forEach((o) => o.setVisible(true))
     this.shopButtonBg.setVisible(true)
     this.shopButtonText.setVisible(true)
-    this.shopButtonText.setText(`🛒 상점\n💰 ${this.totalCoins}`)
+    this.shopButtonText.setText(t('shopButtonLabel', { coins: this.totalCoins }))
     this.manualButtonBg.setVisible(true)
     this.manualButtonText.setVisible(true)
     this.leaderboardButtonBg.setVisible(true)
     this.leaderboardButtonText.setVisible(true)
+    this.langButtonBg.setVisible(true)
+    this.langButtonText.setVisible(true)
 
     // 상점에서 로켓/불꽃을 바꿨을 수 있으니, 표지 로고 아이콘도 최신 장착 상태로 갱신한다.
     const skin = this.getEquippedSkin()
@@ -741,6 +738,8 @@ class GameScene extends Phaser.Scene {
     this.manualButtonText.setVisible(false)
     this.leaderboardButtonBg.setVisible(false)
     this.leaderboardButtonText.setVisible(false)
+    this.langButtonBg.setVisible(false)
+    this.langButtonText.setVisible(false)
     this.renderLeaderboard()
   }
 
@@ -762,6 +761,8 @@ class GameScene extends Phaser.Scene {
     this.manualButtonText.setVisible(true)
     this.leaderboardButtonBg.setVisible(true)
     this.leaderboardButtonText.setVisible(true)
+    this.langButtonBg.setVisible(true)
+    this.langButtonText.setVisible(true)
   }
 
   renderLeaderboard() {
@@ -780,7 +781,7 @@ class GameScene extends Phaser.Scene {
 
     let cursorY = 20
     const backButton = this.add
-      .text(14, cursorY, '← 뒤로', { ...style, fontSize: '14px' })
+      .text(14, cursorY, t('backButton'), { ...style, fontSize: '14px' })
       .setOrigin(0, 0)
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => this.closeLeaderboard())
@@ -788,14 +789,14 @@ class GameScene extends Phaser.Scene {
     this.leaderboardTexts.push(backButton)
 
     const title = this.add
-      .text(GAME_WIDTH / 2, cursorY, '🏆 전체 랭킹 TOP 10', { ...style, fontSize: '18px', align: 'center' })
+      .text(GAME_WIDTH / 2, cursorY, t('leaderboardTitle'), { ...style, fontSize: '18px', align: 'center' })
       .setOrigin(0.5, 0)
     this.leaderboardTexts.push(title)
     let cursorY2 = cursorY + title.height + 18
 
     if (!isLeaderboardEnabled()) {
       const notice = this.add
-        .text(GAME_WIDTH / 2, cursorY2, '랭킹 기능은 아직 준비 중이에요!\n조금만 기다려주세요.', {
+        .text(GAME_WIDTH / 2, cursorY2, t('leaderboardDisabled'), {
           ...style,
           fontSize: '14px',
           align: 'center',
@@ -806,7 +807,7 @@ class GameScene extends Phaser.Scene {
     }
 
     const loading = this.add
-      .text(GAME_WIDTH / 2, cursorY2, '불러오는 중...', { ...style, fontSize: '14px', align: 'center' })
+      .text(GAME_WIDTH / 2, cursorY2, t('leaderboardLoading'), { ...style, fontSize: '14px', align: 'center' })
       .setOrigin(0.5, 0)
     this.leaderboardTexts.push(loading)
 
@@ -815,12 +816,13 @@ class GameScene extends Phaser.Scene {
     fetchTopScores(10).then((scores) => {
       if (this.state !== 'leaderboard') return
       loading.destroy()
-      this.leaderboardTexts = this.leaderboardTexts.filter((t) => t !== loading)
+      // 여기 콜백 파라미터 이름을 t로 두면 i18n의 t() 함수를 가려버리므로(shadowing) txt로 둔다.
+      this.leaderboardTexts = this.leaderboardTexts.filter((txt) => txt !== loading)
 
       let rowY = cursorY2
       if (scores.length === 0) {
         const empty = this.add
-          .text(GAME_WIDTH / 2, rowY, '아직 등록된 기록이 없어요.\n첫 번째 랭커가 되어보세요!', {
+          .text(GAME_WIDTH / 2, rowY, t('leaderboardEmpty'), {
             ...style,
             fontSize: '13px',
             align: 'center',
@@ -844,7 +846,7 @@ class GameScene extends Phaser.Scene {
           this.leaderboardTexts.push(nameRow)
 
           const statsRow = this.add
-            .text(0, rowY + nameRow.height + 2, `최고 ${s.bestScore ?? 0}   평균 ${avgScore}   ${gamesPlayed}판`, {
+            .text(0, rowY + nameRow.height + 2, t('leaderboardStats', { best: s.bestScore ?? 0, avg: avgScore, games: gamesPlayed }), {
               ...style,
               fontSize: '11px',
               color: '#cfd8ff',
@@ -890,7 +892,7 @@ class GameScene extends Phaser.Scene {
 
       if (this.nickname) {
         const myInfo = this.add
-          .text(GAME_WIDTH / 2, rowY, `내 닉네임: ${this.nickname}  ✏️ 변경`, { ...style, fontSize: '12px', color: '#ffe066' })
+          .text(GAME_WIDTH / 2, rowY, t('leaderboardMyNickname', { nickname: this.nickname }), { ...style, fontSize: '12px', color: '#ffe066' })
           .setOrigin(0.5, 0)
           .setInteractive({ useHandCursor: true })
           .on('pointerdown', () => this.setupNicknameAndSubmit())
@@ -899,7 +901,7 @@ class GameScene extends Phaser.Scene {
         rowY += myInfo.height + 10
       } else {
         const joinBtn = this.add
-          .text(GAME_WIDTH / 2, rowY, '✏️ 닉네임 정하고 참여하기', { ...style, fontSize: '14px', color: '#ffe066' })
+          .text(GAME_WIDTH / 2, rowY, t('leaderboardJoin'), { ...style, fontSize: '14px', color: '#ffe066' })
           .setOrigin(0.5, 0)
           .setInteractive({ useHandCursor: true })
           .on('pointerdown', () => this.setupNicknameAndSubmit())
@@ -909,7 +911,7 @@ class GameScene extends Phaser.Scene {
       }
 
       const disclaimer = this.add
-        .text(GAME_WIDTH / 2, rowY, '⚠️ 욕설/비방성 닉네임은 예고 없이 삭제될 수 있어요.', {
+        .text(GAME_WIDTH / 2, rowY, t('leaderboardDisclaimer'), {
           ...style,
           fontSize: '10px',
           color: '#8a8fa8',
@@ -940,9 +942,9 @@ class GameScene extends Phaser.Scene {
       this.hasSeenNicknamePrompt = true
       localStorage.setItem(HAS_SEEN_NICKNAME_PROMPT_KEY, 'true')
       const nickname = await this.promptNickname('', {
-        message: '🏆 전체 랭킹에 표시될 닉네임을 정해보세요!\n(최대 8자, 나중에 랭킹 화면에서도 설정 가능)',
-        confirmLabel: '저장하기',
-        skipLabel: '그냥하기',
+        message: t('nicknameFirstMessage'),
+        confirmLabel: t('nicknameFirstConfirm'),
+        skipLabel: t('nicknameFirstSkip'),
       })
       if (nickname) {
         this.nickname = nickname
@@ -959,9 +961,9 @@ class GameScene extends Phaser.Scene {
   // 문구/버튼 표현이 달라야 해서 옵션으로 받는다.
   promptNickname(defaultValue, options = {}) {
     const {
-      message = '닉네임을 입력하세요 (최대 8자)',
-      confirmLabel = '확인',
-      skipLabel = '취소',
+      message = t('nicknamePromptMessage'),
+      confirmLabel = t('nicknamePromptConfirm'),
+      skipLabel = t('nicknamePromptCancel'),
     } = options
     return new Promise((resolve) => {
       const overlay = document.createElement('div')
@@ -1006,7 +1008,7 @@ class GameScene extends Phaser.Scene {
         const v = input.value.trim()
         if (!v) return
         if (containsBannedWord(v)) {
-          errorLabel.textContent = '사용할 수 없는 닉네임이에요. 다른 닉네임을 입력해주세요.'
+          errorLabel.textContent = t('nicknameBannedWord')
           errorLabel.style.display = 'block'
           return
         }
@@ -1052,14 +1054,14 @@ class GameScene extends Phaser.Scene {
     let cursorY = 20
 
     const title = this.add
-      .text(GAME_WIDTH / 2, cursorY, `🛒 상점   💰 ${this.totalCoins}`, { ...style, fontSize: '17px', align: 'center' })
+      .text(GAME_WIDTH / 2, cursorY, t('shopTitle', { coins: this.totalCoins }), { ...style, fontSize: '17px', align: 'center' })
       .setOrigin(0.5, 0)
     this.shopTexts.push(title)
 
     // 목록이 길어지면 아래쪽 "탭해서 닫기"까지 스크롤(이 게임엔 스크롤이 없어 화면 밖)해야
     // 닫을 수 있는 문제가 있어서, 항상 보이는 왼쪽 위에 뒤로가기 버튼을 따로 둔다.
     const backButton = this.add
-      .text(14, cursorY, '← 뒤로', { ...style, fontSize: '14px' })
+      .text(14, cursorY, t('backButton'), { ...style, fontSize: '14px' })
       .setOrigin(0, 0)
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => this.closeShop())
@@ -1081,8 +1083,8 @@ class GameScene extends Phaser.Scene {
     const tabHeight = 26
     const tabCenterY = cursorY + tabHeight / 2
     const tabDefs = [
-      { key: 'rocket', label: '🚀 로켓 스킨', x: GAME_WIDTH / 2 - tabWidth / 2 - 4 },
-      { key: 'flame', label: '🔥 불꽃 색상', x: GAME_WIDTH / 2 + tabWidth / 2 + 4 },
+      { key: 'rocket', label: t('shopTabRocket'), x: GAME_WIDTH / 2 - tabWidth / 2 - 4 },
+      { key: 'flame', label: t('shopTabFlame'), x: GAME_WIDTH / 2 + tabWidth / 2 + 4 },
     ]
     tabDefs.forEach((tab) => {
       const active = this.shopTab === tab.key
@@ -1108,7 +1110,7 @@ class GameScene extends Phaser.Scene {
     const rocketBonus = this.getRocketBonusPercent()
     const flameBonus = this.getFlameBonusPercent()
     const bonusRow = this.add
-      .text(GAME_WIDTH / 2, cursorY, `🎁 아이템 확률 보너스   로켓 +${rocketBonus}%   불꽃 +${flameBonus}%`, {
+      .text(GAME_WIDTH / 2, cursorY, t('shopBonusRow', { rocket: rocketBonus, flame: flameBonus }), {
         ...style,
         fontSize: '12px',
         color: '#ffe066',
@@ -1130,35 +1132,42 @@ class GameScene extends Phaser.Scene {
       const unlocked = this.isItemUnlocked(item)
       let statusLines
       if (item.id === equippedId) {
-        statusLines = ['✅ 장착중']
+        statusLines = [t('shopEquipped')]
       } else if (owned) {
-        statusLines = ['보유함 (선택)']
+        statusLines = [t('shopOwned')]
       } else if (!unlocked) {
         // 조건 두 개를 각각 줄로 나누고 그 사이에 구분선까지 넣으니 세로로 너무 길어져서
         // (뒤쪽 아이템이 화면 밖으로 밀림), 둘 다 있으면 한 줄로 합쳐서 보여준다.
         statusLines = []
         if (item.unlock.streak !== undefined && item.unlock.nearMiss !== undefined) {
           statusLines.push(
-            `🔒 ${item.unlock.streak}일 연속(${this.dailyStreak}일차) & 아슬아슬 ${item.unlock.nearMiss}번(${this.nearMissTotal}번)`,
+            t('shopLockedBoth', {
+              streakReq: item.unlock.streak,
+              streakCur: this.dailyStreak,
+              nearMissReq: item.unlock.nearMiss,
+              nearMissCur: this.nearMissTotal,
+            }),
           )
         } else if (item.unlock.streak !== undefined) {
-          statusLines.push(`🔒 ${item.unlock.streak}일 연속 접속 필요 (현재 ${this.dailyStreak}일차)`)
+          statusLines.push(t('shopLockedStreak', { req: item.unlock.streak, cur: this.dailyStreak }))
         } else if (item.unlock.nearMiss !== undefined) {
-          statusLines.push(`🔒 아슬아슬 ${item.unlock.nearMiss}번 필요 (현재 ${this.nearMissTotal}번)`)
+          statusLines.push(t('shopLockedNearMiss', { req: item.unlock.nearMiss, cur: this.nearMissTotal }))
         }
       } else {
-        statusLines = [`💰 ${item.cost}`]
+        statusLines = [t('shopCost', { cost: item.cost })]
       }
       // 로켓/불꽃마다 아이템 확률 보너스가 얼마나 늘어나는지 보유 여부와 상관없이 항상 보여줘서,
       // 안 산 아이템도 "사면 이만큼 오른다"는 게 바로 보이게 한다.
       if (item.bonusPercent) {
-        statusLines.push(owned ? `🎁 아이템 확률 +${item.bonusPercent}%` : `🎁 획득 시 아이템 확률 +${item.bonusPercent}%`)
+        statusLines.push(
+          t(owned ? 'shopBonusOwned' : 'shopBonusLocked', { percent: item.bonusPercent }),
+        )
       }
 
       // 줄 수/폰트가 아이템마다 달라서 높이를 미리 계산할 수 없으니, 먼저 위쪽 기준(origin y=0)으로
       // 텍스트를 그린 다음 실제 렌더된 높이(.height)를 재서 아이콘을 그 세로 중앙에 맞추고,
       // 다음 아이템은 그 높이만큼 커서를 내린 위치에서 시작한다 — 절대 겹칠 수 없다.
-      const label = `[${i + 1}] ${item.name}\n${statusLines.join('\n')}`
+      const label = `[${i + 1}] ${t(item.nameKey)}\n${statusLines.join('\n')}`
       const longestLine = Math.max(...statusLines.map((l) => l.length))
       const smallFont = statusLines.length > 1 || longestLine > 13
       const row = this.add
@@ -1198,11 +1207,11 @@ class GameScene extends Phaser.Scene {
     const owned = this.isSkinOwned(skin.id)
     if (!owned) {
       if (!this.isItemUnlocked(skin)) {
-        this.showAchievement('🔒 아직 해금 조건을 못 채웠어요!')
+        this.showAchievement(t('shopLockedGeneric'))
         return
       }
       if (this.totalCoins < skin.cost) {
-        this.showAchievement('💰 코인이 부족해요!')
+        this.showAchievement(t('shopNotEnoughCoins'))
         return
       }
       this.totalCoins -= skin.cost
@@ -1226,11 +1235,11 @@ class GameScene extends Phaser.Scene {
     const owned = this.isFlameOwned(flame.id)
     if (!owned) {
       if (!this.isItemUnlocked(flame)) {
-        this.showAchievement('🔒 아직 해금 조건을 못 채웠어요!')
+        this.showAchievement(t('shopLockedGeneric'))
         return
       }
       if (this.totalCoins < flame.cost) {
-        this.showAchievement('💰 코인이 부족해요!')
+        this.showAchievement(t('shopNotEnoughCoins'))
         return
       }
       this.totalCoins -= flame.cost
@@ -2077,12 +2086,12 @@ class GameScene extends Phaser.Scene {
     this.titleGroup.push(closeWord, rocketWord)
 
     this.subtitleText = this.add
-      .text(GAME_WIDTH / 2, 150, '(아슬로켓)', { ...textStyle, fontSize: '15px', color: '#ffe066' })
+      .text(GAME_WIDTH / 2, 150, t('readySubtitle'), { ...textStyle, fontSize: '15px', color: '#ffe066' })
       .setOrigin(0.5)
     this.titleGroup.push(this.subtitleText)
 
     this.messageText = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 35, '탭하거나 스페이스바를 눌러 시작', {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 35, t('readyCta'), {
         ...textStyle,
         fontSize: '22px',
         align: 'center',
@@ -2091,7 +2100,7 @@ class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
 
     this.subMessageText = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `최고 점수: ${this.bestScore}`, {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2, t('readyBestScore', { best: this.bestScore }), {
         ...textStyle,
         fontSize: '18px',
         align: 'center',
@@ -2102,7 +2111,7 @@ class GameScene extends Phaser.Scene {
       .text(
         GAME_WIDTH / 2,
         GAME_HEIGHT / 2 + 30,
-        this.dailyStreak >= 2 ? `🔥 ${this.dailyStreak}일 연속 접속 중!` : '오늘 첫 도전, 내일도 또 오세요!',
+        this.dailyStreak >= 2 ? t('readyStreakActive', { days: this.dailyStreak }) : t('readyStreakNone'),
         { ...textStyle, fontSize: '14px' },
       )
       .setOrigin(0.5)
@@ -2119,7 +2128,7 @@ class GameScene extends Phaser.Scene {
       .on('pointerdown', () => this.openShop())
     this.shopButtonBg.isUiButton = true
     this.shopButtonText = this.add
-      .text(GAME_WIDTH - 72, cornerY, `🛒 상점\n💰 ${this.totalCoins}`, { ...textStyle, fontSize: '13px', align: 'center' })
+      .text(GAME_WIDTH - 72, cornerY, t('shopButtonLabel', { coins: this.totalCoins }), { ...textStyle, fontSize: '13px', align: 'center' })
       .setOrigin(0.5)
 
     this.manualButtonBg = this.add
@@ -2132,7 +2141,7 @@ class GameScene extends Phaser.Scene {
       })
     this.manualButtonBg.isUiButton = true
     this.manualButtonText = this.add
-      .text(72, cornerY, '📖 게임 방법\n다시보기', { ...textStyle, fontSize: '13px', align: 'center' })
+      .text(72, cornerY, t('manualButtonLabel'), { ...textStyle, fontSize: '13px', align: 'center' })
       .setOrigin(0.5)
 
     // 로그인 없이도 경쟁심리를 자극할 수 있게, 닉네임만 정하면 전체 랭킹에 참여할 수 있게 한다.
@@ -2144,13 +2153,34 @@ class GameScene extends Phaser.Scene {
       .on('pointerdown', () => this.openLeaderboard())
     this.leaderboardButtonBg.isUiButton = true
     this.leaderboardButtonText = this.add
-      .text(GAME_WIDTH / 2, 205, '🏆 전체 랭킹 보기', { ...textStyle, fontSize: '14px' })
+      .text(GAME_WIDTH / 2, 205, t('leaderboardButtonLabel'), { ...textStyle, fontSize: '14px' })
+      .setOrigin(0.5)
+
+    // 언어 토글 버튼 (대기화면 전용). 다른 UI와 안 겹치는 오른쪽 위 빈 공간에 둔다.
+    // 클릭하면 언어를 바꾸고 scene.restart()로 화면 전체를 새 언어로 다시 그린다 —
+    // 정적으로 한 번만 생성되는 텍스트들(표지 제목, 모서리 버튼 등)까지 전부 갱신하는
+    // 가장 확실한 방법이며, 이 코드베이스가 다른 전체 갱신 상황에서도 이미 쓰는 방식이다.
+    // restartYesText/restartNoText와 같은 이유로 scene.restart()를 다음 틱으로 미룬다 —
+    // 같은 클릭 이벤트 안에서 바로 재시작하면, 새로 만들어진 씬의 전역 pointerdown
+    // 핸들러가 이번 이벤트 처리 중에 한 번 더 불려서 의도치 않은 동작으로 이어질 수 있다.
+    this.langButtonBg = this.add
+      .rectangle(GAME_WIDTH - 40, 20, 72, 28, 0x1a1a2e, 0.85)
+      .setStrokeStyle(2, 0x8fe3ff)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        if (this.state !== 'ready') return
+        toggleLang()
+        this.time.delayedCall(0, () => this.scene.restart())
+      })
+    this.langButtonBg.isUiButton = true
+    this.langButtonText = this.add
+      .text(GAME_WIDTH - 40, 20, t('langToggleLabel'), { ...textStyle, fontSize: '12px' })
       .setOrigin(0.5)
 
     // 게임오버 화면 전용 "이어하기" 버튼. messageText 안에 힌트 문구로만 있으면 키보드가 없는
     // 모바일에서는 누를 방법이 없어서, 탭 가능한 별도 텍스트로 분리해둔다.
     this.continueButtonText = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 12, '📺 광고 보고 이어하기', {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 12, t('continueButtonLabel'), {
         ...textStyle,
         fontSize: '16px',
         color: '#ffe066',
@@ -2167,7 +2197,7 @@ class GameScene extends Phaser.Scene {
     // "예" = 재시작과 동시에 바로 플레이 시작. "아니오" = 처음 화면(대기화면)으로만 돌아감
     // (바로 재시작하고 싶지 않을 수도 있으니, 최고점수/상점을 볼 수 있는 화면으로 보내준다).
     this.restartYesText = this.add
-      .text(GAME_WIDTH / 2 - 45, GAME_HEIGHT / 2 + 130, '✅ 예', { ...textStyle, fontSize: '18px' })
+      .text(GAME_WIDTH / 2 - 45, GAME_HEIGHT / 2 + 130, t('restartYes'), { ...textStyle, fontSize: '18px' })
       .setOrigin(0.5)
       .setVisible(false)
       .setInteractive({ useHandCursor: true })
@@ -2180,7 +2210,7 @@ class GameScene extends Phaser.Scene {
     this.restartYesText.isUiButton = true
 
     this.restartNoText = this.add
-      .text(GAME_WIDTH / 2 + 45, GAME_HEIGHT / 2 + 130, '❌ 아니오', { ...textStyle, fontSize: '18px' })
+      .text(GAME_WIDTH / 2 + 45, GAME_HEIGHT / 2 + 130, t('restartNo'), { ...textStyle, fontSize: '18px' })
       .setOrigin(0.5)
       .setVisible(false)
       .setInteractive({ useHandCursor: true })
@@ -2205,12 +2235,12 @@ class GameScene extends Phaser.Scene {
     // 표지(대기화면) 다음, 실제 게임 시작 전에 한 번 보여주는 매뉴얼 화면. 처음 방문한
     // 사람만 자동으로 보고(localStorage 플래그), 그 다음부턴 대기화면에서 바로 시작한다.
     this.manualTitleText = this.add
-      .text(GAME_WIDTH / 2, 70, '📖 게임 방법', { ...textStyle, fontSize: '26px' })
+      .text(GAME_WIDTH / 2, 70, t('manualTitle'), { ...textStyle, fontSize: '26px' })
       .setOrigin(0.5)
       .setVisible(false)
 
     this.manualBodyText = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, MANUAL_TEXT, {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 20, t('manualText'), {
         ...textStyle,
         fontSize: '14px',
         align: 'left',
@@ -2221,7 +2251,7 @@ class GameScene extends Phaser.Scene {
       .setVisible(false)
 
     this.manualContinueText = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT - 50, '👉 탭하거나 스페이스바를 눌러 시작', {
+      .text(GAME_WIDTH / 2, GAME_HEIGHT - 50, t('manualContinueCta'), {
         ...textStyle,
         fontSize: '16px',
         color: '#ffe066',
@@ -2244,6 +2274,8 @@ class GameScene extends Phaser.Scene {
     this.manualButtonText.setVisible(false)
     this.leaderboardButtonBg.setVisible(false)
     this.leaderboardButtonText.setVisible(false)
+    this.langButtonBg.setVisible(false)
+    this.langButtonText.setVisible(false)
     this.manualTitleText.setVisible(true)
     this.manualBodyText.setVisible(true)
     this.manualContinueText.setVisible(true)
@@ -2272,6 +2304,8 @@ class GameScene extends Phaser.Scene {
     this.manualButtonText.setVisible(true)
     this.leaderboardButtonBg.setVisible(true)
     this.leaderboardButtonText.setVisible(true)
+    this.langButtonBg.setVisible(true)
+    this.langButtonText.setVisible(true)
   }
 
   updateShieldDisplay() {
@@ -2344,6 +2378,8 @@ class GameScene extends Phaser.Scene {
     this.manualButtonText.setVisible(false)
     this.leaderboardButtonBg.setVisible(false)
     this.leaderboardButtonText.setVisible(false)
+    this.langButtonBg.setVisible(false)
+    this.langButtonText.setVisible(false)
     this.continueButtonText.setVisible(false)
     this.hideRestartPrompt()
     this.hideManual()
@@ -2362,11 +2398,11 @@ class GameScene extends Phaser.Scene {
 
     // 팝업 텍스트가 하나뿐이라 동시에 여러 번 부르면 나중 것만 보이므로, 시작 안내 →
     // 세트 효과 순서로 시간차를 두고 보여준다.
-    this.showAchievement(START_TIER_TEXT)
+    this.showAchievement(t('startTier'))
     const bonusPercent = this.getCollectionBonusPercent()
     if (bonusPercent > 0) {
       this.time.delayedCall(1800, () => {
-        this.showAchievement(`🎁 세트 효과 발동! 아이템 획득 확률 ${bonusPercent}% 증가!`)
+        this.showAchievement(t('setBonusActivated', { percent: bonusPercent }))
       })
     }
   }
@@ -2528,23 +2564,23 @@ class GameScene extends Phaser.Scene {
 
     if (type === 'shield') {
       if (this.shieldCount >= MAX_SHIELD_STACK) {
-        this.showAchievement(`🛡️ 실드 가득참! (${MAX_SHIELD_STACK}/${MAX_SHIELD_STACK})`)
+        this.showAchievement(t('shieldFull', { count: MAX_SHIELD_STACK, max: MAX_SHIELD_STACK }))
         return
       }
       this.playPowerupSound()
       this.shieldCount += 1
       this.shieldRing.setVisible(true)
       this.updateShieldDisplay()
-      this.showAchievement(`🛡️ 실드 충전! (${this.shieldCount}/${MAX_SHIELD_STACK})`)
+      this.showAchievement(t('shieldCharged', { count: this.shieldCount, max: MAX_SHIELD_STACK }))
     } else {
       if (this.bombCount >= MAX_BOMB_STACK) {
-        this.showAchievement(`💣 폭탄 가득참! (${MAX_BOMB_STACK}/${MAX_BOMB_STACK})`)
+        this.showAchievement(t('bombFull', { count: MAX_BOMB_STACK, max: MAX_BOMB_STACK }))
         return
       }
       this.playPowerupSound()
       this.bombCount += 1
       this.updateBombDisplay()
-      this.showAchievement(`💣 폭탄 보관! (${this.bombCount}/${MAX_BOMB_STACK}) 탭해서 사용`)
+      this.showAchievement(t('bombStored', { count: this.bombCount, max: MAX_BOMB_STACK }))
     }
   }
 
@@ -2596,14 +2632,14 @@ class GameScene extends Phaser.Scene {
       if (!this.beatBestThisRun && this.score > this.bestScore) {
         this.beatBestThisRun = true
         this.playCheerSound()
-        this.showAchievement('🎉 신기록 달성!')
+        this.showAchievement(t('newRecord'))
       }
       if (this.score >= GALAXY_TIER_SCORE) this.activateGalaxyTier()
       this.checkAchievements()
       this.updateDifficultyFromScore()
     }
 
-    this.showAchievement(`💣 폭탄! +${count}`)
+    this.showAchievement(t('bombEffect', { count }))
   }
 
   showShieldBreakEffect() {
@@ -2674,7 +2710,7 @@ class GameScene extends Phaser.Scene {
         if (!this.beatBestThisRun && this.score > this.bestScore) {
           this.beatBestThisRun = true
           this.playCheerSound()
-          this.showAchievement('🎉 신기록 달성!')
+          this.showAchievement(t('newRecord'))
         }
         if (this.score >= GALAXY_TIER_SCORE) this.activateGalaxyTier()
         this.checkAchievements()
@@ -2735,7 +2771,7 @@ class GameScene extends Phaser.Scene {
     // 다닥다닥 붙어 보여서, 게임오버 화면 전용으로 글자를 줄이고 사이 간격을 벌려준다.
     // scene.restart()로 돌아가면 어차피 이 세 텍스트도 create()에서 원래 크기로 새로 만들어지니
     // 여기서 스타일을 바꿔도 대기화면에는 영향이 없다.
-    this.messageText.setText('게임 오버\n다시 하시겠습니까?')
+    this.messageText.setText(t('gameOverTitle'))
     this.messageText.setFontSize(18)
     this.messageText.setY(GAME_HEIGHT / 2 - 88)
     this.messageText.setVisible(true)
@@ -2746,9 +2782,14 @@ class GameScene extends Phaser.Scene {
 
     const avgScore = this.totalGamesPlayed > 0 ? Math.round(this.totalScoreSum / this.totalGamesPlayed) : 0
     this.subMessageText.setText(
-      `점수: ${this.score}   최고 점수: ${this.bestScore}\n` +
-        `아슬아슬: ${this.runNearMissCount}번   평균 점수: ${avgScore}\n` +
-        `💰 획득: ${this.lastRunCoinsEarned}   보유: ${this.totalCoins}`,
+      t('gameOverStats', {
+        score: this.score,
+        best: this.bestScore,
+        nearMiss: this.runNearMissCount,
+        avg: avgScore,
+        earned: this.lastRunCoinsEarned,
+        total: this.totalCoins,
+      }),
     )
     this.subMessageText.setFontSize(13)
     this.subMessageText.setY(GAME_HEIGHT / 2 + 26)
