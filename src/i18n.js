@@ -56,6 +56,8 @@ export const translations = {
 
     // 광고 자리표시자
     adPlaceholder: '📺 광고 재생 중... (자리표시자)',
+    adReadyMessage: '🎬 광고가 준비됐어요!',
+    adWatchButton: '▶ 광고 보고 이어하기',
 
     // 아슬아슬 보너스 팝업
     nearMissBonus: '아슬아슬! +1',
@@ -165,6 +167,8 @@ export const translations = {
     flameSkinDiamond: '💎 Diamond Flame (Limited)',
 
     adPlaceholder: '📺 Playing ad... (placeholder)',
+    adReadyMessage: '🎬 Your ad is ready!',
+    adWatchButton: '▶ Watch ad to continue',
 
     nearMissBonus: 'Close call! +1',
 

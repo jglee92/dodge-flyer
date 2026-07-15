@@ -231,6 +231,7 @@ class GameScene extends Phaser.Scene {
     this.shopTab = 'rocket'
     this.nickname = localStorage.getItem(NICKNAME_KEY) || null
     initLeaderboard()
+    if (typeof window.adConfig !== 'undefined') window.adConfig({ sound: 'on' })
     this.holoHue = 0
     this.animRegenTimer = 0
     this.sparkleTimer = 0
@@ -561,7 +562,7 @@ class GameScene extends Phaser.Scene {
     })
   }
 
-  // ---------- 광고 SDK 연동 전 자리표시자 ----------
+  // ---------- 광고: 웹은 Google Ad Placement API(리워드), 승인 전/광고 없음이면 자리표시자로 대체 ----------
 
   playPlaceholderAd(onComplete) {
     this.state = 'ad-placeholder'
@@ -572,10 +573,89 @@ class GameScene extends Phaser.Scene {
     this.time.delayedCall(CONTINUE_AD_DURATION, onComplete)
   }
 
+  // adBreak()의 showAdFn()은 "사용자의 직접적인 클릭"에서 호출해야 하므로, 광고 준비가
+  // 됐다는 신호(beforeReward)를 받으면 바로 재생하지 않고 확인 버튼을 하나 더 보여준 뒤
+  // 그 클릭에서 showAdFn()을 호출한다.
+  showAdConfirmPrompt(showAdFn) {
+    const baseStyle = {
+      fontFamily: 'system-ui, sans-serif',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 4,
+      resolution: TEXT_RESOLUTION,
+    }
+    const backdrop = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.65).setDepth(900)
+    const label = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 25, t('adReadyMessage'), { ...baseStyle, fontSize: '17px', align: 'center' })
+      .setOrigin(0.5)
+      .setDepth(901)
+    const btn = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 25, t('adWatchButton'), { ...baseStyle, fontSize: '18px', color: '#ffe066' })
+      .setOrigin(0.5)
+      .setDepth(901)
+      .setInteractive({ useHandCursor: true })
+    btn.isUiButton = true
+    btn.on('pointerdown', () => {
+      backdrop.destroy()
+      label.destroy()
+      btn.destroy()
+      showAdFn()
+    })
+  }
+
+  // 리워드 광고 재생을 시도한다. Ad Placement API가 없거나(스크립트 차단 등), 계정이 아직
+  // 이 광고 유형 서빙 승인 전이라 광고 자체를 못 띄우면(beforeReward가 한 번도 안 불림)
+  // 자리표시자로 대체해서 "이어하기" 흐름 자체는 끊기지 않게 한다.
+  requestRewardedAd() {
+    if (typeof window.adBreak === 'undefined') {
+      this.playPlaceholderAd(() => this.continueAfterAd())
+      return
+    }
+
+    // index.html의 adBreak/adConfig는 adsbygoogle 배열에 그냥 쌓아두기만 하는 큐라서,
+    // 광고 차단 프로그램 등으로 실제 adsbygoogle.js 자체가 로드되지 않으면 그 큐를 아무도
+    // 처리하지 않아 콜백이 영원히 하나도 안 불릴 수 있다. 일정 시간 안에 아무 콜백도 안 오면
+    // 자리표시자로 대체해서 플레이어가 멈춰있지 않게 한다.
+    let settled = false
+    const fallbackTimer = this.time.delayedCall(4000, () => {
+      if (settled) return
+      settled = true
+      this.playPlaceholderAd(() => this.continueAfterAd())
+    })
+
+    window.adBreak({
+      type: 'reward',
+      name: 'continue-game',
+      beforeReward: (showAdFn) => {
+        settled = true
+        fallbackTimer.remove()
+        this.showAdConfirmPrompt(showAdFn)
+      },
+      adViewed: () => {
+        settled = true
+        fallbackTimer.remove()
+        this.continueAfterAd()
+      },
+      adDismissed: () => {
+        // 끝까지 안 봐서 보상 없음 — 다시 시도할 수 있게 게임오버 확인 화면으로 되돌린다.
+        settled = true
+        fallbackTimer.remove()
+        this.usedContinueThisRun = false
+        this.showRestartPrompt()
+      },
+      adBreakDone: () => {
+        if (settled) return
+        settled = true
+        fallbackTimer.remove()
+        this.playPlaceholderAd(() => this.continueAfterAd())
+      },
+    })
+  }
+
   tryContinue() {
     if (this.state !== 'gameover' || this.usedContinueThisRun) return
     this.usedContinueThisRun = true
-    this.playPlaceholderAd(() => this.continueAfterAd())
+    this.requestRewardedAd()
   }
 
   continueAfterAd() {
@@ -2846,7 +2926,10 @@ new Phaser.Game({
   },
   scale: {
     mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
+    // #app 쪽 flexbox(justify-content/align-items: center)가 이미 캔버스를 중앙에 놓고
+    // 있는데, Phaser의 autoCenter도 같이 켜두면 캔버스에 직접 margin을 얹어서 중앙 정렬이
+    // 두 번 겹쳐 적용된다. 좁은 폰 화면에서는 차이가 작아 안 보이다가, 데스크톱처럼 창이
+    // 넓을 때 그 오차가 커져서 오른쪽으로 쏠려 보였다. CSS 쪽 하나로만 정렬하게 끈다.
   },
   scene: GameScene,
 })

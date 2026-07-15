@@ -7,6 +7,14 @@
     <title>아슬로켓</title>
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2115777789192453"
      crossorigin="anonymous"></script>
+    <script>
+      // Ad Placement API(웹용 리워드/전면 광고) 초기화 — adsbygoogle.js가 아직 로드되기 전에
+      // adBreak()/adConfig()를 호출해도 큐에 쌓아뒀다가 로드된 뒤 처리해준다.
+      window.adsbygoogle = window.adsbygoogle || []
+      window.adBreak = window.adConfig = function (o) {
+        window.adsbygoogle.push(o)
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>
