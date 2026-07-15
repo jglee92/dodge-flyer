@@ -1,5 +1,17 @@
 import { initializeApp } from 'firebase/app'
-import { getFirestore, doc, getDoc, setDoc, increment, collection, query, orderBy, limit as fsLimit, getDocs } from 'firebase/firestore'
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  increment,
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  limit as fsLimit,
+  getDocs,
+} from 'firebase/firestore'
 import { firebaseConfig, isFirebaseConfigured } from './firebaseConfig.js'
 
 // 로그인 없이도 "이 기기"를 계속 같은 랭킹 항목으로 갱신할 수 있게, 한 번 생성한
@@ -56,5 +68,16 @@ export async function fetchTopScores(count = 10) {
   if (!db) return []
   const q = query(collection(db, 'leaderboard'), orderBy('bestScore', 'desc'), fsLimit(count))
   const snap = await getDocs(q)
-  return snap.docs.map((d) => d.data())
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+}
+
+// 신고는 읽을 필요 없이 쌓아두기만 하면 되니 컬렉션을 따로 둔다. 개발자가 Firestore
+// 콘솔에서 직접 확인하고, 문제 있으면 leaderboard 쪽 항목을 지우는 식으로 처리한다.
+export async function reportEntry(entryId, nickname) {
+  if (!db) return
+  await addDoc(collection(db, 'reports'), {
+    entryId,
+    entryNickname: nickname,
+    reportedAt: Date.now(),
+  })
 }

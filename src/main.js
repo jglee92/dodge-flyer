@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import './style.css'
-import { initLeaderboard, isLeaderboardEnabled, submitScore, fetchTopScores } from './leaderboard.js'
+import { initLeaderboard, isLeaderboardEnabled, submitScore, fetchTopScores, reportEntry } from './leaderboard.js'
+import { containsBannedWord } from './profanityFilter.js'
 
 const GAME_WIDTH = 400
 const GAME_HEIGHT = 600
@@ -867,6 +868,21 @@ class GameScene extends Phaser.Scene {
           nameRow.setX(startX + iconSize + iconGap)
           statsRow.setX(startX + iconSize + iconGap)
 
+          // 욕설 필터를 우회한 닉네임이 있을 수 있으니, 각 항목마다 신고할 수 있게 한다.
+          // 신고 내역은 개발자가 콘솔에서 직접 확인하고 문제 있으면 지운다.
+          const reportBtn = this.add
+            .text(GAME_WIDTH - 18, rowY + blockHeight / 2, '🚩', { fontSize: '13px' })
+            .setOrigin(0.5)
+            .setInteractive({ useHandCursor: true })
+            .on('pointerdown', () => {
+              if (reportBtn.reported) return
+              reportBtn.reported = true
+              reportBtn.setAlpha(0.4)
+              reportEntry(s.id, s.nickname)
+            })
+          reportBtn.isUiButton = true
+          this.leaderboardTexts.push(reportBtn)
+
           rowY += blockHeight + 10
         })
         rowY += 6
@@ -880,6 +896,7 @@ class GameScene extends Phaser.Scene {
           .on('pointerdown', () => this.setupNicknameAndSubmit())
         myInfo.isUiButton = true
         this.leaderboardTexts.push(myInfo)
+        rowY += myInfo.height + 10
       } else {
         const joinBtn = this.add
           .text(GAME_WIDTH / 2, rowY, '✏️ 닉네임 정하고 참여하기', { ...style, fontSize: '14px', color: '#ffe066' })
@@ -888,7 +905,20 @@ class GameScene extends Phaser.Scene {
           .on('pointerdown', () => this.setupNicknameAndSubmit())
         joinBtn.isUiButton = true
         this.leaderboardTexts.push(joinBtn)
+        rowY += joinBtn.height + 10
       }
+
+      const disclaimer = this.add
+        .text(GAME_WIDTH / 2, rowY, '⚠️ 욕설/비방성 닉네임은 예고 없이 삭제될 수 있어요.', {
+          ...style,
+          fontSize: '10px',
+          color: '#8a8fa8',
+          strokeThickness: 2,
+          align: 'center',
+          wordWrap: { width: GAME_WIDTH - 40 },
+        })
+        .setOrigin(0.5, 0)
+      this.leaderboardTexts.push(disclaimer)
     })
   }
 
@@ -952,6 +982,9 @@ class GameScene extends Phaser.Scene {
       input.style.cssText =
         'font-size: 16px; padding: 6px 10px; border-radius: 6px; border: none; text-align: center; width: 160px;'
 
+      const errorLabel = document.createElement('div')
+      errorLabel.style.cssText = 'color: #ff6b6b; font-size: 12px; display: none;'
+
       const buttonRow = document.createElement('div')
       buttonRow.style.cssText = 'display: flex; gap: 10px;'
 
@@ -971,17 +1004,27 @@ class GameScene extends Phaser.Scene {
       }
       confirmBtn.addEventListener('click', () => {
         const v = input.value.trim()
-        if (v) finish(v)
+        if (!v) return
+        if (containsBannedWord(v)) {
+          errorLabel.textContent = '사용할 수 없는 닉네임이에요. 다른 닉네임을 입력해주세요.'
+          errorLabel.style.display = 'block'
+          return
+        }
+        finish(v)
       })
       cancelBtn.addEventListener('click', () => finish(null))
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') confirmBtn.click()
+      })
+      input.addEventListener('input', () => {
+        errorLabel.style.display = 'none'
       })
 
       buttonRow.appendChild(confirmBtn)
       buttonRow.appendChild(cancelBtn)
       box.appendChild(label)
       box.appendChild(input)
+      box.appendChild(errorLabel)
       box.appendChild(buttonRow)
       overlay.appendChild(box)
       document.body.appendChild(overlay)
@@ -2440,9 +2483,10 @@ class GameScene extends Phaser.Scene {
     icon.label = this.add.text(spawnX, spawnY, type === 'shield' ? '🛡️' : '💣', { fontSize: '16px' }).setOrigin(0.5)
 
     // 로켓이 직접 부딪히는 것 외에, 마우스 클릭/탭으로도 바로 주울 수 있게 한다.
-    // 화면상 아이콘(반지름 13px)보다 넉넉하게(+15px) 판정을 넓혀서 손가락 탭에서도 잘 잡히게 한다.
+    // 화면상 아이콘(반지름 13px)보다 넉넉하게(+22px) 판정을 넓혀서 손가락 탭에서도 잘 잡히게 한다.
+    // (아이템이 계속 움직이고 있어서, 판정이 너무 빠듯하면 탭한 순간 이미 살짝 벗어나 있을 수 있다.)
     icon.setInteractive(
-      new Phaser.Geom.Circle(POWERUP_RADIUS, POWERUP_RADIUS, POWERUP_RADIUS + 15),
+      new Phaser.Geom.Circle(POWERUP_RADIUS, POWERUP_RADIUS, POWERUP_RADIUS + 22),
       Phaser.Geom.Circle.Contains,
     )
     icon.input.cursor = 'pointer'
@@ -2723,6 +2767,13 @@ new Phaser.Game({
   // 보인다. 실제 프레임버퍼 해상도를 화면 배율만큼 올려서 텍스트/그래픽이 선명하게 나오게 한다.
   resolution: Math.min(window.devicePixelRatio || 1, 3),
   backgroundColor: '#050818',
+  // Phaser 기본값은 터치 포인터를 1개만 추적한다. 이 게임처럼 탭으로 날갯짓하면서
+  // 동시에 화면 위 아이템도 탭해야 하는 경우, 이전 터치가 완전히 안 끝난 채로 빠르게
+  // 다음 탭을 하면 두 번째 터치가 그냥 무시돼버려서 "가끔 아이템이 안 먹힌다"는 문제가
+  // 생겼다. 여러 포인터를 동시에 추적하게 늘려서 이런 탭 유실을 줄인다.
+  input: {
+    activePointers: 3,
+  },
   physics: {
     default: 'arcade',
     arcade: {
