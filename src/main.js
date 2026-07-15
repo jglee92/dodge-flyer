@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import './style.css'
+import { initLeaderboard, isLeaderboardEnabled, submitScore, fetchTopScores } from './leaderboard.js'
 
 const GAME_WIDTH = 400
 const GAME_HEIGHT = 600
@@ -72,6 +73,8 @@ const NEAR_MISS_TOTAL_KEY = 'dodgeflyer-near-miss-total'
 const TOTAL_GAMES_KEY = 'dodgeflyer-total-games'
 const TOTAL_SCORE_SUM_KEY = 'dodgeflyer-total-score-sum'
 const HAS_SEEN_MANUAL_KEY = 'dodgeflyer-seen-manual'
+const NICKNAME_KEY = 'dodgeflyer-nickname'
+const HAS_SEEN_NICKNAME_PROMPT_KEY = 'dodgeflyer-seen-nickname-prompt'
 
 const MANUAL_TEXT =
   '🚀 화면을 탭하거나 스페이스바로 로켓을 밀어내요\n' +
@@ -205,6 +208,8 @@ class GameScene extends Phaser.Scene {
     this.totalGamesPlayed = Number(localStorage.getItem(TOTAL_GAMES_KEY) || 0)
     this.totalScoreSum = Number(localStorage.getItem(TOTAL_SCORE_SUM_KEY) || 0)
     this.hasSeenManual = localStorage.getItem(HAS_SEEN_MANUAL_KEY) === 'true'
+    this.hasSeenNicknamePrompt = localStorage.getItem(HAS_SEEN_NICKNAME_PROMPT_KEY) === 'true'
+    this.manualIsFirstRun = false
     this.runCoins = 0
     this.lastRunCoinsEarned = 0
     this.runNearMissCount = 0
@@ -219,7 +224,10 @@ class GameScene extends Phaser.Scene {
     // 리셋해서 반드시 새로 만들어지게 한다.
     this.achievementText = null
     this.shopTexts = null
+    this.leaderboardTexts = null
     this.shopTab = 'rocket'
+    this.nickname = localStorage.getItem(NICKNAME_KEY) || null
+    initLeaderboard()
     this.holoHue = 0
     this.animRegenTimer = 0
     this.sparkleTimer = 0
@@ -285,11 +293,18 @@ class GameScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-C', () => this.tryContinue())
     this.input.keyboard.on('keydown-B', () => this.useBomb())
     this.input.keyboard.on('keydown-M', () => {
-      if (this.state === 'ready') this.showManual()
+      if (this.state === 'ready') {
+        this.manualIsFirstRun = false
+        this.showManual()
+      }
     })
     this.input.keyboard.on('keydown-S', () => {
       if (this.state === 'ready') this.openShop()
       else if (this.state === 'shop') this.closeShop()
+    })
+    this.input.keyboard.on('keydown-L', () => {
+      if (this.state === 'ready') this.openLeaderboard()
+      else if (this.state === 'leaderboard') this.closeLeaderboard()
     })
 
     this.spawnTimer = this.time.addEvent({
@@ -668,6 +683,8 @@ class GameScene extends Phaser.Scene {
     this.shopButtonText.setVisible(false)
     this.manualButtonBg.setVisible(false)
     this.manualButtonText.setVisible(false)
+    this.leaderboardButtonBg.setVisible(false)
+    this.leaderboardButtonText.setVisible(false)
     this.renderShop()
   }
 
@@ -688,6 +705,8 @@ class GameScene extends Phaser.Scene {
     this.shopButtonText.setText(`🛒 상점\n💰 ${this.totalCoins}`)
     this.manualButtonBg.setVisible(true)
     this.manualButtonText.setVisible(true)
+    this.leaderboardButtonBg.setVisible(true)
+    this.leaderboardButtonText.setVisible(true)
 
     // 상점에서 로켓/불꽃을 바꿨을 수 있으니, 표지 로고 아이콘도 최신 장착 상태로 갱신한다.
     const skin = this.getEquippedSkin()
@@ -702,6 +721,269 @@ class GameScene extends Phaser.Scene {
   toggleShopTab() {
     this.shopTab = this.shopTab === 'rocket' ? 'flame' : 'rocket'
     this.renderShop()
+  }
+
+  // ---------- 랭킹 (로그인 없이 닉네임만으로 참여) ----------
+
+  openLeaderboard() {
+    if (this.state !== 'ready') return
+    this.state = 'leaderboard'
+    this.bird.setVisible(false)
+    this.scoreText.setVisible(false)
+    this.messageText.setVisible(false)
+    this.subMessageText.setVisible(false)
+    this.streakText.setVisible(false)
+    this.titleGroup.forEach((o) => o.setVisible(false))
+    this.shopButtonBg.setVisible(false)
+    this.shopButtonText.setVisible(false)
+    this.manualButtonBg.setVisible(false)
+    this.manualButtonText.setVisible(false)
+    this.leaderboardButtonBg.setVisible(false)
+    this.leaderboardButtonText.setVisible(false)
+    this.renderLeaderboard()
+  }
+
+  closeLeaderboard() {
+    if (this.leaderboardTexts) {
+      this.leaderboardTexts.forEach((t) => t.destroy())
+      this.leaderboardTexts = null
+    }
+    this.state = 'ready'
+    this.bird.setVisible(true)
+    this.scoreText.setVisible(true)
+    this.messageText.setVisible(true)
+    this.subMessageText.setVisible(true)
+    this.streakText.setVisible(true)
+    this.titleGroup.forEach((o) => o.setVisible(true))
+    this.shopButtonBg.setVisible(true)
+    this.shopButtonText.setVisible(true)
+    this.manualButtonBg.setVisible(true)
+    this.manualButtonText.setVisible(true)
+    this.leaderboardButtonBg.setVisible(true)
+    this.leaderboardButtonText.setVisible(true)
+  }
+
+  renderLeaderboard() {
+    if (this.leaderboardTexts) {
+      this.leaderboardTexts.forEach((t) => t.destroy())
+    }
+    this.leaderboardTexts = []
+
+    const style = {
+      fontFamily: 'system-ui, sans-serif',
+      fontSize: '14px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 3,
+    }
+
+    let cursorY = 20
+    const backButton = this.add
+      .text(14, cursorY, '← 뒤로', { ...style, fontSize: '14px' })
+      .setOrigin(0, 0)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.closeLeaderboard())
+    backButton.isUiButton = true
+    this.leaderboardTexts.push(backButton)
+
+    const title = this.add
+      .text(GAME_WIDTH / 2, cursorY, '🏆 전체 랭킹 TOP 10', { ...style, fontSize: '18px', align: 'center' })
+      .setOrigin(0.5, 0)
+    this.leaderboardTexts.push(title)
+    let cursorY2 = cursorY + title.height + 18
+
+    if (!isLeaderboardEnabled()) {
+      const notice = this.add
+        .text(GAME_WIDTH / 2, cursorY2, '랭킹 기능은 아직 준비 중이에요!\n조금만 기다려주세요.', {
+          ...style,
+          fontSize: '14px',
+          align: 'center',
+        })
+        .setOrigin(0.5, 0)
+      this.leaderboardTexts.push(notice)
+      return
+    }
+
+    const loading = this.add
+      .text(GAME_WIDTH / 2, cursorY2, '불러오는 중...', { ...style, fontSize: '14px', align: 'center' })
+      .setOrigin(0.5, 0)
+    this.leaderboardTexts.push(loading)
+
+    // 목록을 불러오는 동안 사용자가 뒤로 나가버릴 수 있으니, 그 사이 상점처럼 다른 화면으로
+    // 넘어갔다면 이제 와서 화면에 그리지 않는다(이미 없는 leaderboardTexts를 건드리면 위험하다).
+    fetchTopScores(10).then((scores) => {
+      if (this.state !== 'leaderboard') return
+      loading.destroy()
+      this.leaderboardTexts = this.leaderboardTexts.filter((t) => t !== loading)
+
+      let rowY = cursorY2
+      if (scores.length === 0) {
+        const empty = this.add
+          .text(GAME_WIDTH / 2, rowY, '아직 등록된 기록이 없어요.\n첫 번째 랭커가 되어보세요!', {
+            ...style,
+            fontSize: '13px',
+            align: 'center',
+          })
+          .setOrigin(0.5, 0)
+        this.leaderboardTexts.push(empty)
+        rowY += empty.height + 16
+      } else {
+        // 순위 한 줄에 다 욱여넣으면(닉네임/로켓/최고/평균/참여) 400px 폭에서 글자가 너무
+        // 작아져 읽기 힘들어지니, "닉네임+로켓 아이콘" 한 줄 + 통계 작은 글씨 한 줄로 나눈다.
+        scores.forEach((s, i) => {
+          const medal = ['🥇', '🥈', '🥉'][i] || `${i + 1}.`
+          const skin = ROCKET_SKINS.find((sk) => sk.id === s.skinId) || ROCKET_SKINS[0]
+          const flame = FLAME_SKINS.find((fl) => fl.id === s.flameId) || FLAME_SKINS[0]
+          const gamesPlayed = s.gamesPlayed || 0
+          const avgScore = gamesPlayed > 0 ? Math.round((s.totalScore || 0) / gamesPlayed) : 0
+
+          const nameRow = this.add
+            .text(0, rowY, `${medal} ${s.nickname}`, { ...style, fontSize: '14px' })
+            .setOrigin(0, 0)
+          this.leaderboardTexts.push(nameRow)
+
+          const statsRow = this.add
+            .text(0, rowY + nameRow.height + 2, `최고 ${s.bestScore ?? 0}   평균 ${avgScore}   ${gamesPlayed}판`, {
+              ...style,
+              fontSize: '11px',
+              color: '#cfd8ff',
+              strokeThickness: 2,
+            })
+            .setOrigin(0, 0)
+          this.leaderboardTexts.push(statsRow)
+
+          // 아이콘+글자 덩어리를 하나로 보고, 그 폭만큼 좌우 여백을 맞춰서 화면 중앙에 오게 한다.
+          const blockHeight = nameRow.height + statsRow.height + 2
+          const iconSize = 56
+          const iconGap = 12
+          const textWidth = Math.max(nameRow.width, statsRow.width)
+          const startX = (GAME_WIDTH - (iconSize + iconGap + textWidth)) / 2
+
+          const icon = this.add
+            .image(startX + iconSize / 2, rowY + blockHeight / 2, this.ensureCombinedPreviewTexture(skin, flame, 12))
+            .setOrigin(0.5)
+          this.leaderboardTexts.push(icon)
+
+          nameRow.setX(startX + iconSize + iconGap)
+          statsRow.setX(startX + iconSize + iconGap)
+
+          rowY += blockHeight + 10
+        })
+        rowY += 6
+      }
+
+      if (this.nickname) {
+        const myInfo = this.add
+          .text(GAME_WIDTH / 2, rowY, `내 닉네임: ${this.nickname}`, { ...style, fontSize: '12px', color: '#ffe066' })
+          .setOrigin(0.5, 0)
+        this.leaderboardTexts.push(myInfo)
+      } else {
+        const joinBtn = this.add
+          .text(GAME_WIDTH / 2, rowY, '✏️ 닉네임 정하고 참여하기', { ...style, fontSize: '14px', color: '#ffe066' })
+          .setOrigin(0.5, 0)
+          .setInteractive({ useHandCursor: true })
+          .on('pointerdown', () => this.setupNicknameAndSubmit())
+        joinBtn.isUiButton = true
+        this.leaderboardTexts.push(joinBtn)
+      }
+    })
+  }
+
+  async setupNicknameAndSubmit() {
+    const nickname = await this.promptNickname(this.nickname || '')
+    if (!nickname) return
+    this.nickname = nickname
+    localStorage.setItem(NICKNAME_KEY, nickname)
+    await submitScore(nickname, this.bestScore, this.getEquippedSkinId(), this.getEquippedFlameId())
+    if (this.state === 'leaderboard') this.renderLeaderboard()
+  }
+
+  // 매뉴얼을 처음 다 보고 나면 딱 한 번만 닉네임을 저장할지 물어본다. 물어본 다음 바로
+  // 게임을 시작해버리면 "닉네임 짓자마자 갑자기 플레이 중"이 돼서 당황스러우니, 대기화면으로
+  // 돌아가서 다른 화면 전환과 마찬가지로 사용자가 직접 탭해서 시작하게 한다.
+  // "그냥하기"를 눌러도 다시는 안 물어보고, 나중에 랭킹 화면에서 언제든 설정할 수 있다.
+  async maybePromptNicknameThenReady() {
+    if (!this.hasSeenNicknamePrompt) {
+      this.hasSeenNicknamePrompt = true
+      localStorage.setItem(HAS_SEEN_NICKNAME_PROMPT_KEY, 'true')
+      const nickname = await this.promptNickname('', {
+        message: '🏆 전체 랭킹에 표시될 닉네임을 정해보세요!\n(최대 8자, 나중에 랭킹 화면에서도 설정 가능)',
+        confirmLabel: '저장하기',
+        skipLabel: '그냥하기',
+      })
+      if (nickname) {
+        this.nickname = nickname
+        localStorage.setItem(NICKNAME_KEY, nickname)
+        submitScore(nickname, this.bestScore, this.getEquippedSkinId(), this.getEquippedFlameId())
+      }
+    }
+    this.closeManualToReady()
+  }
+
+  // Phaser 캔버스 위에 순수 HTML <input>을 겹쳐서 닉네임을 받는다. 나중에 앱(Capacitor
+  // 웹뷰)으로 패키징해도 동작을 보장할 수 있게, window.prompt() 대신 이 방식을 쓴다.
+  // 처음 시작할 때(저장하기/그냥하기)와 랭킹 화면에서 다시 설정할 때(확인/취소)
+  // 문구/버튼 표현이 달라야 해서 옵션으로 받는다.
+  promptNickname(defaultValue, options = {}) {
+    const {
+      message = '닉네임을 입력하세요 (최대 8자)',
+      confirmLabel = '확인',
+      skipLabel = '취소',
+    } = options
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div')
+      overlay.style.cssText =
+        'position: fixed; inset: 0; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; z-index: 1000;'
+
+      const box = document.createElement('div')
+      box.style.cssText =
+        'background: #14142b; border: 2px solid #ffd700; border-radius: 10px; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; align-items: center; font-family: system-ui, sans-serif; max-width: 280px;'
+
+      const label = document.createElement('div')
+      label.textContent = message
+      label.style.cssText = 'color: #fff; font-size: 14px; text-align: center; white-space: pre-line;'
+
+      const input = document.createElement('input')
+      input.maxLength = 8
+      input.value = defaultValue
+      input.style.cssText =
+        'font-size: 16px; padding: 6px 10px; border-radius: 6px; border: none; text-align: center; width: 160px;'
+
+      const buttonRow = document.createElement('div')
+      buttonRow.style.cssText = 'display: flex; gap: 10px;'
+
+      const confirmBtn = document.createElement('button')
+      confirmBtn.textContent = confirmLabel
+      confirmBtn.style.cssText =
+        'font-size: 15px; padding: 6px 20px; border-radius: 6px; border: none; background: #ffd700; cursor: pointer; font-weight: bold;'
+
+      const cancelBtn = document.createElement('button')
+      cancelBtn.textContent = skipLabel
+      cancelBtn.style.cssText =
+        'font-size: 15px; padding: 6px 20px; border-radius: 6px; border: 1px solid #888; background: transparent; color: #ccc; cursor: pointer;'
+
+      const finish = (value) => {
+        document.body.removeChild(overlay)
+        resolve(value)
+      }
+      confirmBtn.addEventListener('click', () => {
+        const v = input.value.trim()
+        if (v) finish(v)
+      })
+      cancelBtn.addEventListener('click', () => finish(null))
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') confirmBtn.click()
+      })
+
+      buttonRow.appendChild(confirmBtn)
+      buttonRow.appendChild(cancelBtn)
+      box.appendChild(label)
+      box.appendChild(input)
+      box.appendChild(buttonRow)
+      overlay.appendChild(box)
+      document.body.appendChild(overlay)
+      input.focus()
+    })
   }
 
   renderShop() {
@@ -1798,10 +2080,25 @@ class GameScene extends Phaser.Scene {
       .rectangle(72, cornerY, cornerButtonW, cornerButtonH, 0x1a1a2e, 0.85)
       .setStrokeStyle(2, 0xffe066)
       .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.showManual())
+      .on('pointerdown', () => {
+        this.manualIsFirstRun = false
+        this.showManual()
+      })
     this.manualButtonBg.isUiButton = true
     this.manualButtonText = this.add
       .text(72, cornerY, '📖 게임 방법\n다시보기', { ...textStyle, fontSize: '13px', align: 'center' })
+      .setOrigin(0.5)
+
+    // 로그인 없이도 경쟁심리를 자극할 수 있게, 닉네임만 정하면 전체 랭킹에 참여할 수 있게 한다.
+    // 표지 로고와 시작 안내 문구 사이 빈 공간에 둔다.
+    this.leaderboardButtonBg = this.add
+      .rectangle(GAME_WIDTH / 2, 205, 150, 32, 0x1a1a2e, 0.85)
+      .setStrokeStyle(2, 0xffd700)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.openLeaderboard())
+    this.leaderboardButtonBg.isUiButton = true
+    this.leaderboardButtonText = this.add
+      .text(GAME_WIDTH / 2, 205, '🏆 전체 랭킹 보기', { ...textStyle, fontSize: '14px' })
       .setOrigin(0.5)
 
     // 게임오버 화면 전용 "이어하기" 버튼. messageText 안에 힌트 문구로만 있으면 키보드가 없는
@@ -1899,6 +2196,8 @@ class GameScene extends Phaser.Scene {
     this.shopButtonText.setVisible(false)
     this.manualButtonBg.setVisible(false)
     this.manualButtonText.setVisible(false)
+    this.leaderboardButtonBg.setVisible(false)
+    this.leaderboardButtonText.setVisible(false)
     this.manualTitleText.setVisible(true)
     this.manualBodyText.setVisible(true)
     this.manualContinueText.setVisible(true)
@@ -1908,6 +2207,25 @@ class GameScene extends Phaser.Scene {
     this.manualTitleText.setVisible(false)
     this.manualBodyText.setVisible(false)
     this.manualContinueText.setVisible(false)
+  }
+
+  // "게임 방법 다시보기"로 들어왔을 때 닫으면, showManual()이 꺼뒀던 대기화면 요소들을
+  // 전부 되살려서 그냥 대기화면으로 돌아간다(게임이 자동으로 시작되지 않는다).
+  closeManualToReady() {
+    this.hideManual()
+    this.state = 'ready'
+    this.bird.setVisible(true)
+    this.scoreText.setVisible(true)
+    this.messageText.setVisible(true)
+    this.subMessageText.setVisible(true)
+    this.streakText.setVisible(true)
+    this.titleGroup.forEach((o) => o.setVisible(true))
+    this.shopButtonBg.setVisible(true)
+    this.shopButtonText.setVisible(true)
+    this.manualButtonBg.setVisible(true)
+    this.manualButtonText.setVisible(true)
+    this.leaderboardButtonBg.setVisible(true)
+    this.leaderboardButtonText.setVisible(true)
   }
 
   updateShieldDisplay() {
@@ -1939,6 +2257,7 @@ class GameScene extends Phaser.Scene {
       // 처음 방문한 사람만 시작 전에 매뉴얼을 한 번 보여준다. 그 다음부턴(재시작 포함)
       // localStorage에 남아있으니 대기화면에서 바로 시작으로 넘어간다.
       if (!this.hasSeenManual) {
+        this.manualIsFirstRun = true
         this.showManual()
       } else {
         this.startGame()
@@ -1946,8 +2265,14 @@ class GameScene extends Phaser.Scene {
     } else if (this.state === 'manual') {
       this.hasSeenManual = true
       localStorage.setItem(HAS_SEEN_MANUAL_KEY, 'true')
-      this.hideManual()
-      this.startGame()
+      // "다시보기"로 들어온 거면 그냥 보여주기만 하는 화면이니 대기화면으로 돌아가고,
+      // 처음 보는 거면 원래 흐름대로 이어서 게임을 시작한다.
+      if (this.manualIsFirstRun) {
+        this.hideManual()
+        this.maybePromptNicknameThenReady()
+      } else {
+        this.closeManualToReady()
+      }
     } else if (this.state === 'playing') {
       this.flap()
     } else if (this.state === 'gameover') {
@@ -1971,6 +2296,8 @@ class GameScene extends Phaser.Scene {
     this.shopButtonText.setVisible(false)
     this.manualButtonBg.setVisible(false)
     this.manualButtonText.setVisible(false)
+    this.leaderboardButtonBg.setVisible(false)
+    this.leaderboardButtonText.setVisible(false)
     this.continueButtonText.setVisible(false)
     this.hideRestartPrompt()
     this.hideManual()
@@ -2336,6 +2663,9 @@ class GameScene extends Phaser.Scene {
       this.bestScore = this.score
       localStorage.setItem(BEST_SCORE_KEY, String(this.bestScore))
     }
+
+    // 닉네임을 이미 정한 사람만 조용히 자동 제출한다(더 높을 때만 반영되니 매번 불러도 안전하다).
+    if (this.nickname) submitScore(this.nickname, this.score, this.getEquippedSkinId(), this.getEquippedFlameId())
 
     // "이어하기"로 계속 플레이하다 또 죽으면 gameOver()가 다시 호출되는데, runCoins를 그대로 또
     // 더하면 이미 적립된 몫이 중복 적립된다. 커밋한 몫은 스냅샷(lastRunCoinsEarned)에 옮기고
