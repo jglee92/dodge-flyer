@@ -7,6 +7,10 @@ import { t, toggleLang } from './i18n.js'
 const GAME_WIDTH = 400
 const GAME_HEIGHT = 600
 
+// 표지 로고의 로켓 아이콘은 실제 인게임 스프라이트(56x24)를 2배 넘게 확대해서 보여줘서
+// 그대로 쓰면 화질이 깨진다. 이 배율만큼 더 높은 해상도로 따로 그려서 확대해도 선명하게 한다.
+const TITLE_ICON_RES_SCALE = 4
+
 const GRAVITY = 1200
 const FLAP_VELOCITY = 420
 const ROCKET_HIT_RADIUS = 11
@@ -656,10 +660,10 @@ class GameScene extends Phaser.Scene {
 
   // 로켓/불꽃을 따로 보여주면 실제로 장착했을 때 어떻게 어우러지는지 안 보인다는 후기가 있어서,
   // 실제 게임에서 쓰는 drawRocketTexture를 그대로 재사용해 몸통+불꽃이 합쳐진 미리보기를 만든다.
-  ensureCombinedPreviewTexture(skin, flame, flameLen = 14) {
-    const key = `preview-combo-${skin.id}-${flame.id}-${flameLen}`
+  ensureCombinedPreviewTexture(skin, flame, flameLen = 14, resScale = 1) {
+    const key = `preview-combo-${skin.id}-${flame.id}-${flameLen}-${resScale}`
     if (this.textures.exists(key)) return key
-    this.drawRocketTexture(key, flameLen, skin, flame)
+    this.drawRocketTexture(key, flameLen, skin, flame, resScale)
     return key
   }
 
@@ -710,8 +714,8 @@ class GameScene extends Phaser.Scene {
     const skin = this.getEquippedSkin()
     const flame = this.getEquippedFlame()
     this.titleFlameKeys = {
-      short: this.ensureCombinedPreviewTexture(skin, flame, 12),
-      long: this.ensureCombinedPreviewTexture(skin, flame, 20),
+      short: this.ensureCombinedPreviewTexture(skin, flame, 12, TITLE_ICON_RES_SCALE),
+      long: this.ensureCombinedPreviewTexture(skin, flame, 20, TITLE_ICON_RES_SCALE),
     }
     this.titleRocketIcon.setTexture(this.titleFlameOn ? this.titleFlameKeys.long : this.titleFlameKeys.short)
   }
@@ -1388,10 +1392,14 @@ class GameScene extends Phaser.Scene {
     }
   }
 
-  drawRocketTexture(key, flameLen, skin, flameSkin) {
+  // resScale: 실제 게임 스프라이트(작은 56x24 텍스처)를 그대로 표지 로고처럼 몇 배씩 확대해서
+  // 쓰면 화질이 깨진다. 좌표를 전부 resScale배로 키운 캔버스에 그려서, 확대 표시할 곳에서는
+  // 더 높은 해상도 원본을 받아쓸 수 있게 한다(화면에 보이는 크기는 .setScale()로 다시 맞춘다).
+  drawRocketTexture(key, flameLen, skin, flameSkin, resScale = 1) {
     const flame = flameSkin || FLAME_SKINS[0]
-    const w = 56
-    const h = 24
+    const s = resScale
+    const w = 56 * s
+    const h = 24 * s
     const g = this.make.graphics({ x: 0, y: 0, add: false })
 
     if (flame.id === 'rainbow') {
@@ -1408,33 +1416,33 @@ class GameScene extends Phaser.Scene {
         const t1 = (i + 1) / bands
         g.fillStyle(rgb.color, 1)
         g.fillTriangle(
-          16 - bigFlameLen * t0,
-          4 + (20 - 4) * t0 * 0.5,
-          16 - bigFlameLen * t0,
-          20 - (20 - 4) * t0 * 0.5,
-          16 - bigFlameLen * t1,
-          12,
+          (16 - bigFlameLen * t0) * s,
+          (4 + (20 - 4) * t0 * 0.5) * s,
+          (16 - bigFlameLen * t0) * s,
+          (20 - (20 - 4) * t0 * 0.5) * s,
+          (16 - bigFlameLen * t1) * s,
+          12 * s,
         )
       }
       // 안쪽 흰 코어를 겹쳐서 "화끈하게 타오르는" 느낌을 더한다.
       g.fillStyle(0xffffff, 0.85)
-      g.fillTriangle(16, 10, 16, 14, 16 - bigFlameLen * 0.35, 12)
+      g.fillTriangle(16 * s, 10 * s, 16 * s, 14 * s, (16 - bigFlameLen * 0.35) * s, 12 * s)
     } else {
       g.fillStyle(flame.outer, 1)
-      g.fillTriangle(16, 5, 16, 19, 16 - flameLen, 12)
+      g.fillTriangle(16 * s, 5 * s, 16 * s, 19 * s, (16 - flameLen) * s, 12 * s)
       g.fillStyle(flame.inner, 1)
-      g.fillTriangle(16, 9, 16, 15, 16 - flameLen * 0.55, 12)
+      g.fillTriangle(16 * s, 9 * s, 16 * s, 15 * s, (16 - flameLen * 0.55) * s, 12 * s)
 
       if (flame.id === 'diamond') {
         // 다이아몬드 불꽃: 무지개색 대신 하얀 코어가 맥동하며 반짝이는 느낌으로 차별화한다.
         const pulse = 0.5 + 0.5 * Math.sin(((this.holoHue || 0) / 360) * Math.PI * 2)
         g.fillStyle(0xffffff, 0.5 + pulse * 0.4)
-        g.fillTriangle(16, 10, 16, 14, 16 - flameLen * 0.4, 12)
+        g.fillTriangle(16 * s, 10 * s, 16 * s, 14 * s, (16 - flameLen * 0.4) * s, 12 * s)
       }
     }
 
     g.fillStyle(skin.body, 1)
-    g.fillEllipse(30, 12, 30, 18)
+    g.fillEllipse(30 * s, 12 * s, 30 * s, 18 * s)
 
     if (skin.animated) {
       // 홀로그램 스킨: 몸통 위에 무지개 색 사선 띠를 겹쳐서 "빤짝거리는" 느낌을 낸다.
@@ -1445,26 +1453,26 @@ class GameScene extends Phaser.Scene {
         const hue = ((this.holoHue || 0) + (i / stripeCount) * 360) % 360
         const rgb = Phaser.Display.Color.HSVToRGB(hue / 360, 0.75, 1)
         g.fillStyle(rgb.color, 0.7)
-        const sx = 15 + (i / stripeCount) * 30
-        g.fillTriangle(sx, 3, sx + 3, 3, sx - 3, 21)
+        const sx = (15 + (i / stripeCount) * 30) * s
+        g.fillTriangle(sx, 3 * s, sx + 3 * s, 3 * s, sx - 3 * s, 21 * s)
       }
       // 몸통 위에 반짝이는 하이라이트 한 줄을 더 얹어 "정말 반짝인다"는 인상을 강조.
-      const shineX = 16 + ((((this.holoHue || 0) / 360) * 40) % 40)
+      const shineX = (16 + ((((this.holoHue || 0) / 360) * 40) % 40)) * s
       g.fillStyle(0xffffff, 0.55)
-      g.fillTriangle(shineX, 4, shineX + 2, 4, shineX - 2, 20)
+      g.fillTriangle(shineX, 4 * s, shineX + 2 * s, 4 * s, shineX - 2 * s, 20 * s)
     }
 
     g.fillStyle(skin.nose, 1)
-    g.fillTriangle(42, 4, 42, 20, 54, 12)
+    g.fillTriangle(42 * s, 4 * s, 42 * s, 20 * s, 54 * s, 12 * s)
 
     g.fillStyle(skin.fin, 1)
-    g.fillTriangle(18, 2, 28, 10, 12, 10)
-    g.fillTriangle(18, 22, 28, 14, 12, 14)
+    g.fillTriangle(18 * s, 2 * s, 28 * s, 10 * s, 12 * s, 10 * s)
+    g.fillTriangle(18 * s, 22 * s, 28 * s, 14 * s, 12 * s, 14 * s)
 
     g.fillStyle(0x4fc3f7, 1)
-    g.fillCircle(28, 12, 5)
-    g.lineStyle(1, 0x263238, 1)
-    g.strokeCircle(28, 12, 5)
+    g.fillCircle(28 * s, 12 * s, 5 * s)
+    g.lineStyle(1 * s, 0x263238, 1)
+    g.strokeCircle(28 * s, 12 * s, 5 * s)
 
     g.generateTexture(key, w, h)
     g.destroy()
@@ -2043,14 +2051,17 @@ class GameScene extends Phaser.Scene {
     // 완전히 정지된 그림이면 밋밋해서, 짧은 불꽃/긴 불꽃 두 텍스처를 번갈아 보여줘서
     // 실제 로켓 분사처럼 살짝 깜빡이는 느낌을 준다.
     this.titleFlameOn = false
+    // 표지 로고는 실제 인게임 스프라이트보다 훨씬 크게 확대해서 보여주는데, 그 작은 텍스처를
+    // 그대로 늘리면 화질이 깨진다. TITLE_ICON_RES_SCALE배 해상도로 따로 그려서 확대해도
+    // 선명하게 나오게 하고, 화면에 보이는 실제 크기는 setScale로 다시 맞춘다.
     this.titleFlameKeys = {
-      short: this.ensureCombinedPreviewTexture(this.getEquippedSkin(), this.getEquippedFlame(), 12),
-      long: this.ensureCombinedPreviewTexture(this.getEquippedSkin(), this.getEquippedFlame(), 20),
+      short: this.ensureCombinedPreviewTexture(this.getEquippedSkin(), this.getEquippedFlame(), 12, TITLE_ICON_RES_SCALE),
+      long: this.ensureCombinedPreviewTexture(this.getEquippedSkin(), this.getEquippedFlame(), 20, TITLE_ICON_RES_SCALE),
     }
     this.titleRocketIcon = this.add
       .image(GAME_WIDTH / 2, 68, this.titleFlameKeys.short)
       .setOrigin(0.5)
-      .setScale(2.2)
+      .setScale(2.2 / TITLE_ICON_RES_SCALE)
       .setRotation(-Math.PI / 2 + 0.3)
     this.titleGroup.push(this.titleRocketIcon)
     this.titleFlameTimer = this.time.addEvent({

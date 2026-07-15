@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# 아이콘/스플래시 생성 스크립트의 임시 출력물 (결과물은 android/res, store-assets에 직접 복사해 씀)
+scripts/out
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
