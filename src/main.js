@@ -1,21 +1,15 @@
 import Phaser from 'phaser'
 import './style.css'
+import { GAME_WIDTH, GAME_HEIGHT, TEXT_RESOLUTION } from './constants.js'
 import { initLeaderboard, isLeaderboardEnabled, submitScore, fetchTopScores, reportEntry } from './leaderboard.js'
 import { containsBannedWord } from './profanityFilter.js'
 import { t, toggleLang } from './i18n.js'
 import { initAdMob, isNativeAdsAvailable, showRewardedAd } from './adMob.js'
-
-const GAME_WIDTH = 400
-const GAME_HEIGHT = 600
+import { HubScene } from './hubScene.js'
 
 // 표지 로고의 로켓 아이콘은 실제 인게임 스프라이트(56x24)를 2배 넘게 확대해서 보여줘서
 // 그대로 쓰면 화질이 깨진다. 이 배율만큼 더 높은 해상도로 따로 그려서 확대해도 선명하게 한다.
 const TITLE_ICON_RES_SCALE = 4
-
-// Phaser Text는 게임 전체의 resolution 설정을 자동으로 물려받지 않고, 스타일에 직접
-// resolution을 안 주면 항상 1배로 그려진다 — 그래서 canvas 자체는 고해상도로 렌더링되는데도
-// 글자만 유독 흐릿해 보였다. 모든 텍스트 스타일에 이 값을 넣어서 폰 고밀도 화면에서도 선명하게 한다.
-const TEXT_RESOLUTION = Math.min(window.devicePixelRatio || 1, 3)
 
 const GRAVITY = 1200
 const FLAP_VELOCITY = 420
@@ -195,9 +189,9 @@ const FLAME_SKINS = [
   },
 ]
 
-class GameScene extends Phaser.Scene {
+class RocketScene extends Phaser.Scene {
   constructor() {
-    super('GameScene')
+    super('RocketScene')
   }
 
   create(data) {
@@ -804,6 +798,8 @@ class GameScene extends Phaser.Scene {
     this.leaderboardButtonText.setVisible(false)
     this.langButtonBg.setVisible(false)
     this.langButtonText.setVisible(false)
+    this.hubButtonBg.setVisible(false)
+    this.hubButtonText.setVisible(false)
     this.renderShop()
   }
 
@@ -828,6 +824,8 @@ class GameScene extends Phaser.Scene {
     this.leaderboardButtonText.setVisible(true)
     this.langButtonBg.setVisible(true)
     this.langButtonText.setVisible(true)
+    this.hubButtonBg.setVisible(true)
+    this.hubButtonText.setVisible(true)
 
     // 상점에서 로켓/불꽃을 바꿨을 수 있으니, 표지 로고 아이콘도 최신 장착 상태로 갱신한다.
     const skin = this.getEquippedSkin()
@@ -863,6 +861,8 @@ class GameScene extends Phaser.Scene {
     this.leaderboardButtonText.setVisible(false)
     this.langButtonBg.setVisible(false)
     this.langButtonText.setVisible(false)
+    this.hubButtonBg.setVisible(false)
+    this.hubButtonText.setVisible(false)
     this.renderLeaderboard()
   }
 
@@ -886,6 +886,8 @@ class GameScene extends Phaser.Scene {
     this.leaderboardButtonText.setVisible(true)
     this.langButtonBg.setVisible(true)
     this.langButtonText.setVisible(true)
+    this.hubButtonBg.setVisible(true)
+    this.hubButtonText.setVisible(true)
   }
 
   renderLeaderboard() {
@@ -2310,6 +2312,22 @@ class GameScene extends Phaser.Scene {
       .text(GAME_WIDTH - 40, 20, t('langToggleLabel'), { ...textStyle, fontSize: '12px' })
       .setOrigin(0.5)
 
+    // 허브(게임 선택 화면)로 돌아가는 버튼. 언어 버튼과 대칭으로 반대편(좌상단) 빈 자리에 둔다.
+    // scene.start()는 이 씬 자체를 완전히 종료시키므로, restart()와 달리 잔여 pointerdown
+    // 이벤트가 되돌아올 대상이 사라져 delayedCall로 지연시킬 필요가 없다.
+    this.hubButtonBg = this.add
+      .rectangle(40, 20, 72, 28, 0x1a1a2e, 0.85)
+      .setStrokeStyle(2, 0xff8a4f)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        if (this.state !== 'ready') return
+        this.scene.start('HubScene')
+      })
+    this.hubButtonBg.isUiButton = true
+    this.hubButtonText = this.add
+      .text(40, 20, t('hubButtonLabel'), { ...textStyle, fontSize: '12px' })
+      .setOrigin(0.5)
+
     // 게임오버 화면 전용 "이어하기" 버튼. messageText 안에 힌트 문구로만 있으면 키보드가 없는
     // 모바일에서는 누를 방법이 없어서, 탭 가능한 별도 텍스트로 분리해둔다.
     this.continueButtonText = this.add
@@ -2409,6 +2427,8 @@ class GameScene extends Phaser.Scene {
     this.leaderboardButtonText.setVisible(false)
     this.langButtonBg.setVisible(false)
     this.langButtonText.setVisible(false)
+    this.hubButtonBg.setVisible(false)
+    this.hubButtonText.setVisible(false)
     this.manualTitleText.setVisible(true)
     this.manualBodyText.setVisible(true)
     this.manualContinueText.setVisible(true)
@@ -2439,6 +2459,8 @@ class GameScene extends Phaser.Scene {
     this.leaderboardButtonText.setVisible(true)
     this.langButtonBg.setVisible(true)
     this.langButtonText.setVisible(true)
+    this.hubButtonBg.setVisible(true)
+    this.hubButtonText.setVisible(true)
   }
 
   updateShieldDisplay() {
@@ -2515,6 +2537,8 @@ class GameScene extends Phaser.Scene {
     this.leaderboardButtonText.setVisible(false)
     this.langButtonBg.setVisible(false)
     this.langButtonText.setVisible(false)
+    this.hubButtonBg.setVisible(false)
+    this.hubButtonText.setVisible(false)
     this.continueButtonText.setVisible(false)
     this.hideRestartPrompt()
     this.hideManual()
@@ -2965,5 +2989,7 @@ new Phaser.Game({
     // 두 번 겹쳐 적용된다. 좁은 폰 화면에서는 차이가 작아 안 보이다가, 데스크톱처럼 창이
     // 넓을 때 그 오차가 커져서 오른쪽으로 쏠려 보였다. CSS 쪽 하나로만 정렬하게 끈다.
   },
-  scene: GameScene,
+  // 배열의 첫 번째 씬만 자동 시작된다 — 앱 진입 시 허브(게임 선택 화면)가 먼저 뜨고,
+  // 로켓 게임은 허브에서 카드를 골라야만(scene.start('RocketScene')) 실행된다.
+  scene: [HubScene, RocketScene],
 })

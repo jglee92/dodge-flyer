@@ -136,6 +136,15 @@ export const translations = {
     bombStored: (p) => `💣 폭탄 보관! (${p.count}/${p.max}) 탭해서 사용`,
     bombEffect: (p) => `💣 폭탄! +${p.count}`,
     newRecord: '🎉 신기록 달성!',
+
+    // 아케이드 허브(게임 선택 화면)
+    hubTitle: '게임 선택',
+    hubSubtitle: '아케이드에서 즐길 게임을 골라보세요',
+    hubGameRocketTitle: '아슬로켓',
+    hubGameRocketDesc: '스쳐 지나갈수록 점수가 오르는 로켓 회피 게임',
+    hubComingSoonTitle: '준비중',
+    hubComingSoonDesc: '다음 게임을 준비하고 있어요',
+    hubButtonLabel: '🏠 허브',
   },
   en: {
     startTier: '☁️ Cloud Zone begins! Dodge the clouds',
@@ -238,6 +247,15 @@ export const translations = {
     bombStored: (p) => `💣 Bomb stored! (${p.count}/${p.max}) Tap to use`,
     bombEffect: (p) => `💣 Bomb! +${p.count}`,
     newRecord: '🎉 New record!',
+
+    // Arcade hub (game-select screen)
+    hubTitle: 'Choose a Game',
+    hubSubtitle: 'Pick a game to play in the arcade',
+    hubGameRocketTitle: 'Close Rocket',
+    hubGameRocketDesc: 'Dodge obstacles — the closer you get, the higher your score',
+    hubComingSoonTitle: 'Coming Soon',
+    hubComingSoonDesc: "We're working on the next game",
+    hubButtonLabel: '🏠 Hub',
   },
 }
 
