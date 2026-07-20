@@ -293,23 +293,45 @@ export class FishingScene extends Phaser.Scene {
   }
 
   // 물고기/상어 실루엣을 로켓/구름/운석과 같은 방식(Graphics로 한 번 그려서 텍스처로 굽고 재사용)으로
-  // 만든다 — 이모지 글리프 대신 크기/색으로 종류를 구분하는 단순하지만 일관된 실루엣.
+  // 만든다. 등지느러미/꼬리(미)지느러미/가슴지느러미/배지느러미/뒷지느러미까지 갖춘 실제 물고기
+  // 해부 구조를 참고해서 그렸다 — 예전엔 몸통+꼬리+등지느러미뿐이라 밋밋했다. 머리가 +x쪽(오른쪽).
   ensureFishTexture(type) {
     const key = `fish-${type.id}`
     if (this.textures.exists(key)) return key
     const r = type.radius
     const w = r * 2.6
     const h = r * 1.6
-    const canvasW = w + r * 1.4
-    const canvasH = h + r * 1.6
+    const canvasW = w + r * 2.4
+    const canvasH = r * 5.2
     const cx = canvasW / 2
     const cy = canvasH / 2
     const g = this.add.graphics()
+
     g.fillStyle(type.fin, 1)
-    g.fillTriangle(cx - w / 2 - r * 0.5, cy, cx - w / 2 + 2, cy - r * 0.5, cx - w / 2 + 2, cy + r * 0.5)
-    g.fillTriangle(cx - r * 0.2, cy - h / 2, cx + r * 0.3, cy - h / 2 - r * 0.4, cx + r * 0.5, cy - h / 2)
+    // 꼬리(미)지느러미 — 위/아래 두 갈래로 갈라진 부채꼴
+    g.fillTriangle(cx - w / 2 + 2, cy - 2, cx - w / 2 - r * 0.9, cy - r * 0.75, cx - w / 2 - r * 0.15, cy)
+    g.fillTriangle(cx - w / 2 + 2, cy + 2, cx - w / 2 - r * 0.9, cy + r * 0.75, cx - w / 2 - r * 0.15, cy)
+    // 등지느러미
+    g.fillTriangle(cx - r * 0.15, cy - h / 2, cx + r * 0.25, cy - h / 2 - r * 0.45, cx + r * 0.5, cy - h / 2)
+    // 가슴지느러미 (머리 바로 뒤, 옆으로) — 배쪽 지느러미 3개가 서로 겹치지 않도록 x축 간격을 넉넉히 뒀다.
+    g.fillTriangle(cx + w * 0.35, cy + h * 0.05, cx + w * 0.15, cy + h * 0.2, cx + w * 0.12, cy + h * 0.6)
+    // 배지느러미 (몸통 중앙 아래)
+    g.fillTriangle(cx + w * 0.05, cy + h * 0.3, cx - w * 0.1, cy + h * 0.35, cx - w * 0.02, cy + h * 0.68)
+    // 뒷지느러미 (배 쪽, 꼬리 앞)
+    g.fillTriangle(cx - w * 0.22, cy + h * 0.35, cx - w * 0.38, cy + h * 0.4, cx - w * 0.28, cy + h * 0.7)
+
     g.fillStyle(type.body, 1)
     g.fillEllipse(cx, cy, w, h)
+    // 배 쪽을 더 밝게(카운터셰이딩) 해서 입체감을 준다.
+    g.fillStyle(0xffffff, 0.18)
+    g.fillEllipse(cx, cy + h * 0.22, w * 0.82, h * 0.5)
+    g.lineStyle(1.5, 0x0a0a0a, 0.35)
+    g.strokeEllipse(cx, cy, w, h)
+
+    // 아가미 선 — 눈보다 몸통 쪽으로 확실히 떨어뜨려서 눈과 겹쳐 보이지 않게 한다.
+    g.lineStyle(1.5, 0x0a0a0a, 0.4)
+    g.lineBetween(cx + w * 0.12, cy - h * 0.3, cx + w * 0.08, cy + h * 0.3)
+
     g.fillStyle(0x0a0a0a, 1)
     g.fillCircle(cx + w / 2 - r * 0.5, cy - r * 0.15, r * 0.15)
     g.generateTexture(key, canvasW, canvasH)
@@ -322,15 +344,35 @@ export class FishingScene extends Phaser.Scene {
     if (this.textures.exists(key)) return key
     const w = 70
     const h = 28
-    const canvasW = w + 44
-    const canvasH = h + 44
+    const canvasW = w + 50
+    const canvasH = h + 60
     const cx = canvasW / 2
     const cy = canvasH / 2
     const g = this.add.graphics()
+
+    g.fillStyle(0x4a5a63, 1)
+    // 꼬리지느러미 (위쪽 엽이 더 큰 비대칭 형태 — 상어 특유의 실루엣)
+    g.fillTriangle(cx - w / 2 + 4, cy, cx - w / 2 - 20, cy - h * 0.9, cx - w / 2 - 2, cy - h * 0.1)
+    g.fillTriangle(cx - w / 2 + 4, cy, cx - w / 2 - 12, cy + h * 0.6, cx - w / 2 - 2, cy + h * 0.1)
+    // 등지느러미 — 몸통 중앙쪽으로 옮겨서 머리 쪽 아가미/가슴지느러미와 안 겹치게 한다.
+    g.fillTriangle(cx - w * 0.05, cy - h / 2, cx + w * 0.16, cy - h / 2 - 20, cx + w * 0.28, cy - h / 2)
+    // 가슴지느러미 — 아가미/눈보다 확실히 몸통 쪽(왼쪽)에 두어 서로 안 겹치게 한다.
+    g.fillTriangle(cx - w * 0.02, cy + h * 0.3, cx - w * 0.15, cy + h * 0.35, cx - w * 0.05, cy + h * 0.75)
+
     g.fillStyle(0x5a6b74, 1)
     g.fillEllipse(cx, cy, w, h)
-    g.fillTriangle(cx + w * 0.1, cy - h / 2, cx + w * 0.32, cy - h / 2 - 18, cx + w * 0.42, cy - h / 2)
-    g.fillTriangle(cx - w / 2 - 14, cy, cx - w / 2 + 4, cy - h * 0.35, cx - w / 2 + 4, cy + h * 0.35)
+    g.fillStyle(0xe8e8e8, 0.9)
+    g.fillEllipse(cx, cy + h * 0.28, w * 0.8, h * 0.4)
+    g.lineStyle(1.5, 0x0a0a0a, 0.35)
+    g.strokeEllipse(cx, cy, w, h)
+
+    // 아가미 틈 (세 줄) — 가슴지느러미와 눈 사이 빈 공간에 둔다.
+    g.lineStyle(1.5, 0x0a0a0a, 0.4)
+    for (let i = 0; i < 3; i++) {
+      const gx = cx + w * 0.12 + i * 4
+      g.lineBetween(gx, cy - h * 0.25, gx - 2, cy + h * 0.25)
+    }
+
     g.fillStyle(0xe8e8e8, 1)
     g.fillTriangle(cx + w / 2 - 6, cy - 4, cx + w / 2 + 14, cy, cx + w / 2 - 6, cy + 8)
     g.fillStyle(0x0a0a0a, 1)
