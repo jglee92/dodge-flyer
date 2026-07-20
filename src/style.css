@@ -16,17 +16,24 @@ body {
 #game-viewport {
   display: flex;
   flex-direction: column;
+  align-items: center;
   width: 100vw;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
 }
 
+/* Phaser의 Scale.FIT은 캔버스의 실제 픽셀 버퍼(400x600)는 그대로 두고 CSS로만 크기를
+   늘려서 화면에 맞춘다 — 즉 캔버스가 커질수록 그만큼 그대로 흐려진다(이 버전의 Phaser는
+   canvas 자체의 해상도를 올려주는 기능이 없다). 넓은 데스크톱 창에서 한없이 커지지 않게
+   최대 크기를 원본의 2배(800x1200)로 묶어서, 그 이상 흐려지는 걸 막는다. */
 #app {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100vw;
+  width: 100%;
+  max-width: 800px;
+  max-height: 1200px;
   flex: 1;
   min-height: 0;
 }
