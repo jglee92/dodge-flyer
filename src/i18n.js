@@ -147,7 +147,7 @@ export const translations = {
     hubButtonLabel: '🏠 허브',
     hubGameFishingTitle: '아슬낚시',
     hubGameFishingDesc: '누르면 내려가고 떼면 올라와요. 물고기를 낚아 코인을 모으세요',
-    hubGameBlockTitle: 'CLOSE PUZZLE',
+    hubGameBlockTitle: '아슬퍼즐',
     hubGameBlockDesc: '블록을 채워 가로/세로 줄을 완성하세요',
 
     // 아슬낚시 (영문 브랜드명: CLOSE FISHING)
@@ -164,8 +164,8 @@ export const translations = {
     fishingRoundOverBest: (p) => `최고 수확: ${p.best}코인`,
     fishingNewBest: '🎉 신기록 달성!',
 
-    // CLOSE PUZZLE
-    blockReadyTitle: '🧩 CLOSE PUZZLE',
+    // 아슬퍼즐 (영문 브랜드명: CLOSE PUZZLE)
+    blockReadyTitle: '🧩 아슬퍼즐',
     blockReadyDesc: (p) => `블록을 끌어다 놓아 가로/세로 줄을 채우면 사라져요.\n보유 코인: ${p.coins}   최고 점수: ${p.best}`,
     blockReadyCta: '👉 탭하거나 스페이스바로 시작',
     blockScoreLabel: (p) => `점수: ${p.score}`,
