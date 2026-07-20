@@ -5,8 +5,8 @@ import { t, toggleLang } from './i18n.js'
 // key: null인 항목은 아직 만들지 않은 미니게임의 "준비중" 자리표시자 카드다.
 const HUB_GAMES = [
   { key: 'RocketScene', titleKey: 'hubGameRocketTitle', descKey: 'hubGameRocketDesc', enabled: true },
-  { key: null, titleKey: 'hubComingSoonTitle', descKey: 'hubComingSoonDesc', enabled: false },
-  { key: null, titleKey: 'hubComingSoonTitle', descKey: 'hubComingSoonDesc', enabled: false },
+  { key: 'FishingScene', titleKey: 'hubGameFishingTitle', descKey: 'hubGameFishingDesc', enabled: true },
+  { key: 'BlockScene', titleKey: 'hubGameBlockTitle', descKey: 'hubGameBlockDesc', enabled: true },
 ]
 
 export class HubScene extends Phaser.Scene {

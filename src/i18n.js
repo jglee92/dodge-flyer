@@ -145,6 +145,34 @@ export const translations = {
     hubComingSoonTitle: '준비중',
     hubComingSoonDesc: '다음 게임을 준비하고 있어요',
     hubButtonLabel: '🏠 허브',
+    hubGameFishingTitle: '타이니 피싱',
+    hubGameFishingDesc: '누르면 내려가고 떼면 올라와요. 물고기를 낚아 코인을 모으세요',
+    hubGameBlockTitle: '블록 퍼즐',
+    hubGameBlockDesc: '블록을 채워 가로/세로 줄을 완성하세요',
+
+    // 타이니 피싱
+    fishingReadyTitle: '🎣 타이니 피싱',
+    fishingReadyDesc: (p) => `누르고 있으면 바늘이 내려가고, 떼면 올라와요.\n물고기를 낚아 수면 위로 가져오면 코인 획득!\n보유 코인: ${p.coins}   최고 수확: ${p.best}`,
+    fishingReadyCta: '👉 탭하거나 스페이스바로 시작',
+    fishingUpgradeLabel: (p) => `🎣 낚싯대 강화 (${p.cost}코인)`,
+    fishingUpgradeMax: '🎣 낚싯대 최고 단계',
+    fishingTimeLeft: (p) => `⏱️ ${p.time}초`,
+    fishingCatchPopup: (p) => `+${p.value}`,
+    fishingBankPopup: (p) => `+${p.coins}코인`,
+    fishingSnap: '💥 줄이 끊겼어요!',
+    fishingRoundOverTitle: (p) => `🎣 이번 수확: ${p.coins}코인`,
+    fishingRoundOverBest: (p) => `최고 수확: ${p.best}코인`,
+    fishingNewBest: '🎉 신기록 달성!',
+
+    // 블록 퍼즐
+    blockReadyTitle: '🧩 블록 퍼즐',
+    blockReadyDesc: (p) => `블록을 끌어다 놓아 가로/세로 줄을 채우면 사라져요.\n보유 코인: ${p.coins}   최고 점수: ${p.best}`,
+    blockReadyCta: '👉 탭하거나 스페이스바로 시작',
+    blockScoreLabel: (p) => `점수: ${p.score}`,
+    blockGameOverTitle: (p) => `🧩 게임 종료! 점수: ${p.score}`,
+    blockGameOverBest: (p) => `최고 점수: ${p.best}`,
+    blockNewBest: '🎉 신기록 달성!',
+    blockCoinsEarned: (p) => `+${p.coins}코인`,
   },
   en: {
     startTier: '☁️ Cloud Zone begins! Dodge the clouds',
@@ -256,6 +284,38 @@ export const translations = {
     hubComingSoonTitle: 'Coming Soon',
     hubComingSoonDesc: "We're working on the next game",
     hubButtonLabel: '🏠 Hub',
+    hubGameFishingTitle: 'Tiny Fishing',
+    hubGameFishingDesc: 'Hold to descend, release to rise. Catch fish for coins',
+    hubGameBlockTitle: 'Block Puzzle',
+    hubGameBlockDesc: 'Fill rows and columns with blocks to clear them',
+
+    // Tiny Fishing
+    fishingReadyTitle: '🎣 Tiny Fishing',
+    fishingReadyDesc: (p) =>
+      `Hold to lower the hook, release to reel it up.\n` +
+      `Bring caught fish back to the surface for coins!\n` +
+      `Coins: ${p.coins}   Best catch: ${p.best}`,
+    fishingReadyCta: '👉 Tap or press Space to start',
+    fishingUpgradeLabel: (p) => `🎣 Upgrade rod (${p.cost} coins)`,
+    fishingUpgradeMax: '🎣 Rod fully upgraded',
+    fishingTimeLeft: (p) => `⏱️ ${p.time}s`,
+    fishingCatchPopup: (p) => `+${p.value}`,
+    fishingBankPopup: (p) => `+${p.coins} coins`,
+    fishingSnap: '💥 Line snapped!',
+    fishingRoundOverTitle: (p) => `🎣 Catch this round: ${p.coins} coins`,
+    fishingRoundOverBest: (p) => `Best catch: ${p.best} coins`,
+    fishingNewBest: '🎉 New record!',
+
+    // Block Puzzle
+    blockReadyTitle: '🧩 Block Puzzle',
+    blockReadyDesc: (p) =>
+      `Drag blocks onto the grid to fill rows/columns and clear them.\nCoins: ${p.coins}   Best score: ${p.best}`,
+    blockReadyCta: '👉 Tap or press Space to start',
+    blockScoreLabel: (p) => `Score: ${p.score}`,
+    blockGameOverTitle: (p) => `🧩 Game Over! Score: ${p.score}`,
+    blockGameOverBest: (p) => `Best score: ${p.best}`,
+    blockNewBest: '🎉 New record!',
+    blockCoinsEarned: (p) => `+${p.coins} coins`,
   },
 }
 

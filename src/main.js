@@ -6,6 +6,8 @@ import { containsBannedWord } from './profanityFilter.js'
 import { t, toggleLang } from './i18n.js'
 import { initAdMob, isNativeAdsAvailable, showRewardedAd } from './adMob.js'
 import { HubScene } from './hubScene.js'
+import { FishingScene } from './fishingScene.js'
+import { BlockScene } from './blockScene.js'
 
 // 표지 로고의 로켓 아이콘은 실제 인게임 스프라이트(56x24)를 2배 넘게 확대해서 보여줘서
 // 그대로 쓰면 화질이 깨진다. 이 배율만큼 더 높은 해상도로 따로 그려서 확대해도 선명하게 한다.
@@ -2990,6 +2992,6 @@ new Phaser.Game({
     // 넓을 때 그 오차가 커져서 오른쪽으로 쏠려 보였다. CSS 쪽 하나로만 정렬하게 끈다.
   },
   // 배열의 첫 번째 씬만 자동 시작된다 — 앱 진입 시 허브(게임 선택 화면)가 먼저 뜨고,
-  // 로켓 게임은 허브에서 카드를 골라야만(scene.start('RocketScene')) 실행된다.
-  scene: [HubScene, RocketScene],
+  // 나머지 게임은 허브에서 카드를 골라야만(scene.start('...')) 실행된다.
+  scene: [HubScene, RocketScene, FishingScene, BlockScene],
 })
