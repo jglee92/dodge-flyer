@@ -7,6 +7,7 @@ import { t, toggleLang } from './i18n.js'
 import { initAdMob, isNativeAdsAvailable, showRewardedAd } from './adMob.js'
 import { HubScene } from './hubScene.js'
 import { FishingScene } from './fishingScene.js'
+import { CandyScene } from './candyScene.js'
 import { BlockScene } from './blockScene.js'
 
 // 표지 로고의 로켓 아이콘은 실제 인게임 스프라이트(56x24)를 2배 넘게 확대해서 보여줘서
@@ -2307,7 +2308,11 @@ class RocketScene extends Phaser.Scene {
       .on('pointerdown', () => {
         if (this.state !== 'ready') return
         toggleLang()
-        this.time.delayedCall(0, () => this.scene.restart())
+        // restart()를 인자 없이 부르면 Phaser가 이전 restart({autoStart:true}) 호출의
+        // settings.data를 그대로 들고 있다가 재사용해버린다("예"를 한 번이라도 누른 적
+        // 있으면 이후 언어 토글도 자동으로 바로 게임을 시작해버리는 버그로 이어졌다).
+        // 매번 명시적으로 autoStart:false를 넘겨서 이전 값이 새는 걸 막는다.
+        this.time.delayedCall(0, () => this.scene.restart({ autoStart: false }))
       })
     this.langButtonBg.isUiButton = true
     this.langButtonText = this.add
@@ -2367,7 +2372,10 @@ class RocketScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setVisible(false)
       .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.time.delayedCall(0, () => this.scene.restart()))
+      // autoStart:false를 명시해야 한다 — 인자 없이 restart()를 부르면 Phaser가 이전
+      // restart({autoStart:true}) 호출 때 저장해둔 settings.data를 그대로 재사용해서,
+      // "예"를 한 번이라도 누른 적 있으면 "아니오"도 자동으로 게임을 다시 시작해버렸다.
+      .on('pointerdown', () => this.time.delayedCall(0, () => this.scene.restart({ autoStart: false })))
     this.restartNoText.isUiButton = true
 
     // 실드/폭탄 인벤토리 표시 (플레이 중에만 보임). 폭탄은 탭하면 바로 씀. 한 손으로 폰을 쥐고
@@ -2997,5 +3005,5 @@ new Phaser.Game({
   },
   // 배열의 첫 번째 씬만 자동 시작된다 — 앱 진입 시 허브(게임 선택 화면)가 먼저 뜨고,
   // 나머지 게임은 허브에서 카드를 골라야만(scene.start('...')) 실행된다.
-  scene: [HubScene, RocketScene, FishingScene, BlockScene],
+  scene: [HubScene, RocketScene, FishingScene, CandyScene, BlockScene],
 })

@@ -147,6 +147,8 @@ export const translations = {
     hubButtonLabel: '🏠 허브',
     hubGameFishingTitle: '아슬낚시',
     hubGameFishingDesc: '누르면 내려가고 떼면 올라와요. 물고기를 낚아 코인을 모으세요',
+    hubGameCandyTitle: '아슬캔디',
+    hubGameCandyDesc: '인접한 타일을 바꿔서 3개 이상 맞춰보세요',
     hubGameBlockTitle: '아슬퍼즐',
     hubGameBlockDesc: '블록을 채워 가로/세로 줄을 완성하세요',
 
@@ -173,6 +175,17 @@ export const translations = {
     blockGameOverBest: (p) => `최고 점수: ${p.best}`,
     blockNewBest: '🎉 신기록 달성!',
     blockCoinsEarned: (p) => `+${p.coins}코인`,
+
+    // 아슬캔디 (영문 브랜드명: Close Candy)
+    candyReadyTitle: '🍬 아슬캔디',
+    candyReadyDesc: (p) => `인접한 타일을 바꿔서 3개 이상 맞추면 사라져요.\n${p.moves}번의 이동 안에 최대한 높은 점수를 노려보세요!\n보유 코인: ${p.coins}   최고 점수: ${p.best}`,
+    candyReadyCta: '👉 탭하거나 스페이스바로 시작',
+    candyMovesLeft: (p) => `이동 ${p.moves}회 남음`,
+    candyScoreLabel: (p) => `점수: ${p.score}`,
+    candyRoundOverTitle: (p) => `🍬 게임 종료! 점수: ${p.score}`,
+    candyRoundOverBest: (p) => `최고 점수: ${p.best}`,
+    candyNewBest: '🎉 신기록 달성!',
+    candyCoinsEarned: (p) => `+${p.coins}코인`,
   },
   en: {
     startTier: '☁️ Cloud Zone begins! Dodge the clouds',
@@ -286,6 +299,8 @@ export const translations = {
     hubButtonLabel: '🏠 Hub',
     hubGameFishingTitle: 'CLOSE FISHING',
     hubGameFishingDesc: 'Hold to descend, release to rise. Catch fish for coins',
+    hubGameCandyTitle: 'Close Candy',
+    hubGameCandyDesc: 'Swap adjacent tiles to match 3 or more',
     hubGameBlockTitle: 'CLOSE PUZZLE',
     hubGameBlockDesc: 'Fill rows and columns with blocks to clear them',
 
@@ -316,6 +331,20 @@ export const translations = {
     blockGameOverBest: (p) => `Best score: ${p.best}`,
     blockNewBest: '🎉 New record!',
     blockCoinsEarned: (p) => `+${p.coins} coins`,
+
+    // Close Candy
+    candyReadyTitle: '🍬 Close Candy',
+    candyReadyDesc: (p) =>
+      `Swap adjacent tiles to match 3 or more and clear them.\n` +
+      `Score as high as you can in ${p.moves} moves!\n` +
+      `Coins: ${p.coins}   Best score: ${p.best}`,
+    candyReadyCta: '👉 Tap or press Space to start',
+    candyMovesLeft: (p) => `${p.moves} moves left`,
+    candyScoreLabel: (p) => `Score: ${p.score}`,
+    candyRoundOverTitle: (p) => `🍬 Game Over! Score: ${p.score}`,
+    candyRoundOverBest: (p) => `Best score: ${p.best}`,
+    candyNewBest: '🎉 New record!',
+    candyCoinsEarned: (p) => `+${p.coins} coins`,
   },
 }
 

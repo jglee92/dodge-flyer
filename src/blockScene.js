@@ -152,7 +152,9 @@ export class BlockScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setVisible(false)
       .setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.time.delayedCall(0, () => this.scene.restart()))
+      // autoStart:false를 명시해야 한다 — 인자 없이 restart()를 부르면 이전
+      // restart({autoStart:true}) 호출의 settings.data를 그대로 재사용해버린다.
+      .on('pointerdown', () => this.time.delayedCall(0, () => this.scene.restart({ autoStart: false })))
     this.restartNoText.isUiButton = true
   }
 

@@ -6,6 +6,7 @@ import { t, toggleLang } from './i18n.js'
 const HUB_GAMES = [
   { key: 'RocketScene', titleKey: 'hubGameRocketTitle', descKey: 'hubGameRocketDesc', enabled: true },
   { key: 'FishingScene', titleKey: 'hubGameFishingTitle', descKey: 'hubGameFishingDesc', enabled: true },
+  { key: 'CandyScene', titleKey: 'hubGameCandyTitle', descKey: 'hubGameCandyDesc', enabled: true },
   { key: 'BlockScene', titleKey: 'hubGameBlockTitle', descKey: 'hubGameBlockDesc', enabled: true },
 ]
 
@@ -42,10 +43,11 @@ export class HubScene extends Phaser.Scene {
       })
     this.add.text(GAME_WIDTH - 40, 20, t('langToggleLabel'), { ...textStyle, fontSize: '12px' }).setOrigin(0.5)
 
-    let cursorY = 140
+    // 게임이 4개로 늘어나서 카드 하나당 높이/간격을 줄여 400x600 화면 안에 다 들어가게 한다.
+    let cursorY = 128
     const cardW = GAME_WIDTH - 60
-    const cardH = 96
-    const cardGap = 18
+    const cardH = 80
+    const cardGap = 12
 
     HUB_GAMES.forEach((game) => {
       const centerY = cursorY + cardH / 2
@@ -53,16 +55,16 @@ export class HubScene extends Phaser.Scene {
         .rectangle(GAME_WIDTH / 2, centerY, cardW, cardH, 0x1a1a2e, game.enabled ? 0.9 : 0.5)
         .setStrokeStyle(2, game.enabled ? 0x4fc3f7 : 0x555566)
       this.add
-        .text(GAME_WIDTH / 2, cursorY + 32, t(game.titleKey), {
+        .text(GAME_WIDTH / 2, cursorY + 26, t(game.titleKey), {
           ...textStyle,
-          fontSize: '20px',
+          fontSize: '18px',
           color: game.enabled ? '#ffffff' : '#888899',
         })
         .setOrigin(0.5)
       this.add
-        .text(GAME_WIDTH / 2, cursorY + 66, t(game.descKey), {
+        .text(GAME_WIDTH / 2, cursorY + 54, t(game.descKey), {
           ...textStyle,
-          fontSize: '13px',
+          fontSize: '12px',
           color: '#c8c8da',
           align: 'center',
           wordWrap: { width: cardW - 24 },
